@@ -1,0 +1,17 @@
+{
+  "name": "synthadoc-obsidian",
+  "version": "0.1.0",
+  "scripts": {
+    "build": "node esbuild.config.mjs production",
+    "dev": "node esbuild.config.mjs",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "builtin-modules": "^3.3.0",
+    "esbuild": "^0.28.0",
+    "obsidian": "latest",
+    "typescript": "^5.3",
+    "vitest": "^4.1.4"
+  }
+}

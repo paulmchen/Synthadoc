@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Paul Chen / axoviq.com
+import { requestUrl } from "obsidian";
+
+let BASE = "http://127.0.0.1:7070";
+
+export function setBase(url: string): void {
+    BASE = url.replace(/\/$/, "");
+}
+
+async function call(path: string, method = "GET", body?: object) {
+    const res = await requestUrl({
+        url: `${BASE}${path}`,
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined,
+        throw: false,
+    });
+    if (res.status < 200 || res.status >= 300) {
+        throw new Error(`synthadoc API ${res.status}`);
+    }
+    return res.json;
+}
+
+export const api = {
+    health:      ()                    => call("/health"),
+    status:      ()                    => call("/status"),
+    query:       (question: string)    => call("/query",        "POST", { question }),
+    ingest:      (source: string)      => call("/jobs/ingest",  "POST", { source }),
+    lint:        (scope = "all")       => call("/jobs/lint",    "POST", { scope }),
+    lintReport:  ()                    => call("/lint/report"),
+    jobs:        (status?: string)     => call(status ? `/jobs?status=${encodeURIComponent(status)}` : "/jobs"),
+};

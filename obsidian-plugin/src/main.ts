@@ -1,0 +1,402 @@
+// SPDX-License-Identifier: AGPL-3.0-or-later
+// Copyright (C) 2026 Paul Chen / axoviq.com
+import { App, MarkdownRenderer, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from "obsidian";
+import { api, setBase } from "./api";
+
+const SUPPORTED_EXTENSIONS = new Set([
+    "md", "txt", "pdf", "docx", "xlsx", "csv",
+    "png", "jpg", "jpeg", "webp", "gif", "tiff",
+]);
+
+interface SynthadocSettings {
+    serverUrl: string;
+    rawSourcesFolder: string;
+}
+
+const DEFAULT_SETTINGS: SynthadocSettings = {
+    serverUrl: "http://127.0.0.1:7070",
+    rawSourcesFolder: "raw_sources",
+};
+
+export default class SynthadocPlugin extends Plugin {
+    settings: SynthadocSettings = DEFAULT_SETTINGS;
+
+    async onload() {
+        await this.loadSettings();
+        setBase(this.settings.serverUrl);
+        this.addSettingTab(new SynthadocSettingTab(this.app, this));
+
+        this.addCommand({
+            id: "synthadoc-ingest-current",
+            name: "Synthadoc: Ingest current file as source",
+            checkCallback: (checking) => {
+                const file = this.app.workspace.getActiveFile();
+                if (!file) return false;
+                if (!checking) this.ingestFile(file);
+                return true;
+            },
+        });
+
+        this.addCommand({
+            id: "synthadoc-ingest-all",
+            name: "Synthadoc: Ingest all sources",
+            callback: () => this.ingestAllSources(),
+        });
+
+        this.addCommand({
+            id: "synthadoc-query",
+            name: "Synthadoc: Query wiki...",
+            callback: () => new QueryModal(this.app).open(),
+        });
+
+        this.addCommand({
+            id: "synthadoc-jobs",
+            name: "Synthadoc: List jobs...",
+            callback: () => new JobsModal(this.app).open(),
+        });
+
+        this.addCommand({
+            id: "synthadoc-lint-report",
+            name: "Synthadoc: Lint report",
+            callback: () => new LintReportModal(this.app).open(),
+        });
+
+        this.addCommand({
+            id: "synthadoc-ingest-url",
+            name: "Synthadoc: Ingest from URL...",
+            callback: () => new IngestUrlModal(this.app).open(),
+        });
+
+        this.addCommand({
+            id: "synthadoc-lint",
+            name: "Synthadoc: Run lint",
+            callback: async () => {
+                new Notice("Synthadoc: running lint...");
+                try {
+                    const r = await api.lint() as any;
+                    new Notice(`Synthadoc: lint done — ${r.contradictions_found} contradictions, ${r.orphans?.length ?? 0} orphans`);
+                } catch { new Notice("Synthadoc: server not running — run 'synthadoc serve'"); }
+            },
+        });
+
+        this.addRibbonIcon("book-open", "Synthadoc status", async () => {
+            try {
+                const s = await api.status() as any;
+                new Notice(`Synthadoc: ${s.pages} pages`);
+            } catch { new Notice("Synthadoc: server not running"); }
+        });
+    }
+
+    async loadSettings() {
+        this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
+    }
+
+    async saveSettings() {
+        await this.saveData(this.settings);
+    }
+
+    async ingestFile(file: TFile) {
+        try {
+            const r = await api.ingest(file.path) as any;
+            new Notice(`Synthadoc: ingest queued (job ${r.job_id})`);
+        } catch { new Notice("Synthadoc: ingest failed — is the server running?"); }
+    }
+
+    async ingestAllSources() {
+        const folder = this.settings.rawSourcesFolder.replace(/\/$/, "");
+        const files = this.app.vault.getFiles().filter(f => {
+            if (!f.path.startsWith(folder + "/")) return false;
+            const ext = f.extension?.toLowerCase() ?? "";
+            return SUPPORTED_EXTENSIONS.has(ext);
+        });
+        if (files.length === 0) {
+            new Notice(`Synthadoc: no files found in '${folder}'`);
+            return;
+        }
+        new Notice(`Synthadoc: queuing ${files.length} source(s)…`);
+        let queued = 0;
+        let failed = 0;
+        for (const file of files) {
+            try {
+                await api.ingest(file.path);
+                queued++;
+            } catch {
+                failed++;
+            }
+        }
+        if (failed === 0) {
+            new Notice(`Synthadoc: ${queued} job(s) queued`);
+        } else {
+            new Notice(`Synthadoc: ${queued} queued, ${failed} failed — is the server running?`);
+        }
+    }
+}
+
+class SynthadocSettingTab extends PluginSettingTab {
+    plugin: SynthadocPlugin;
+
+    constructor(app: App, plugin: SynthadocPlugin) {
+        super(app, plugin);
+        this.plugin = plugin;
+    }
+
+    display(): void {
+        const { containerEl } = this;
+        containerEl.empty();
+        containerEl.createEl("h2", { text: "Synthadoc settings" });
+
+        new Setting(containerEl)
+            .setName("Server URL")
+            .setDesc("URL of the synthadoc HTTP server for this vault (e.g. http://127.0.0.1:7070)")
+            .addText(text => text
+                .setPlaceholder("http://127.0.0.1:7070")
+                .setValue(this.plugin.settings.serverUrl)
+                .onChange(async (value) => {
+                    this.plugin.settings.serverUrl = value;
+                    setBase(value);
+                    await this.plugin.saveSettings();
+                }));
+
+        new Setting(containerEl)
+            .setName("Raw sources folder")
+            .setDesc("Vault-relative folder scanned by 'Ingest all sources' (default: raw_sources)")
+            .addText(text => text
+                .setPlaceholder("raw_sources")
+                .setValue(this.plugin.settings.rawSourcesFolder)
+                .onChange(async (value) => {
+                    this.plugin.settings.rawSourcesFolder = value;
+                    await this.plugin.saveSettings();
+                }));
+    }
+}
+
+const STATUS_OPTIONS = ["all", "pending", "running", "completed", "failed", "dead"] as const;
+
+const STATUS_EMOJI: Record<string, string> = {
+    pending:   "⏳",
+    running:   "▶",
+    completed: "✅",
+    failed:    "❌",
+    dead:      "💀",
+};
+
+class JobsModal extends Modal {
+    private currentStatus = "all";
+    private tableEl: HTMLElement | null = null;
+
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.createEl("h3", { text: "Synthadoc: Jobs" });
+
+        // Filter row
+        const filterRow = contentEl.createEl("div");
+        filterRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:12px";
+        filterRow.createEl("label", { text: "Filter:" });
+        const select = filterRow.createEl("select");
+        for (const s of STATUS_OPTIONS) {
+            const opt = select.createEl("option", { text: s, value: s });
+            if (s === this.currentStatus) opt.selected = true;
+        }
+        const refreshBtn = filterRow.createEl("button", { text: "Refresh" });
+
+        // Table container
+        this.tableEl = contentEl.createEl("div");
+
+        const load = async () => {
+            if (!this.tableEl) return;
+            this.tableEl.setText("Loading…");
+            try {
+                const status = this.currentStatus === "all" ? undefined : this.currentStatus;
+                const jobs = await api.jobs(status) as any[];
+                this.renderTable(jobs);
+            } catch {
+                this.tableEl.setText("Error: is synthadoc serve running?");
+            }
+        };
+
+        select.onchange = () => { this.currentStatus = select.value; load(); };
+        refreshBtn.onclick = () => load();
+        load();
+    }
+
+    private renderTable(jobs: any[]) {
+        if (!this.tableEl) return;
+        this.tableEl.empty();
+
+        if (jobs.length === 0) {
+            this.tableEl.createEl("p", { text: "No jobs found." });
+            return;
+        }
+
+        const table = this.tableEl.createEl("table");
+        table.style.cssText = "width:100%;border-collapse:collapse;font-size:13px";
+
+        const thead = table.createEl("thead");
+        const hrow = thead.createEl("tr");
+        for (const h of ["Status", "Operation", "Source", "Created"]) {
+            const th = hrow.createEl("th", { text: h });
+            th.style.cssText = "text-align:left;padding:4px 8px;border-bottom:1px solid var(--background-modifier-border)";
+        }
+
+        const tbody = table.createEl("tbody");
+        for (const job of jobs) {
+            const tr = tbody.createEl("tr");
+            const source = job.payload?.source
+                ? job.payload.source.split(/[\\/]/).pop()
+                : job.operation === "lint" ? "(lint)" : "—";
+            // SQLite stores UTC without a tz marker; appending +00:00 ensures JS parses it as UTC
+            const created = job.created_at
+                ? new Date(job.created_at.replace(" ", "T") + "+00:00").toLocaleString()
+                : "—";
+            const icon = STATUS_EMOJI[job.status] ?? "";
+            for (const text of [`${icon} ${job.status}`, job.operation, source, created]) {
+                const td = tr.createEl("td", { text });
+                td.style.cssText = "padding:4px 8px;border-bottom:1px solid var(--background-modifier-border-subtle)";
+            }
+            // Show result details if completed
+            if (job.status === "completed" && job.result) {
+                const r = job.result;
+                const detail: string[] = [];
+                if (r.pages_created?.length) detail.push(`created: ${r.pages_created.join(", ")}`);
+                if (r.pages_updated?.length) detail.push(`updated: ${r.pages_updated.join(", ")}`);
+                if (r.pages_flagged?.length) detail.push(`flagged: ${r.pages_flagged.join(", ")}`);
+                if (detail.length) {
+                    const drow = tbody.createEl("tr");
+                    const dtd = drow.createEl("td", { text: detail.join(" · ") });
+                    dtd.colSpan = 4;
+                    dtd.style.cssText = "padding:2px 8px 6px 8px;font-size:11px;color:var(--text-muted)";
+                }
+            }
+            if (job.status === "failed" && job.error) {
+                const erow = tbody.createEl("tr");
+                const etd = erow.createEl("td", { text: `Error: ${job.error}` });
+                etd.colSpan = 4;
+                etd.style.cssText = "padding:2px 8px 6px 8px;font-size:11px;color:var(--text-error)";
+            }
+        }
+    }
+
+    onClose() { this.contentEl.empty(); }
+}
+
+class LintReportModal extends Modal {
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.createEl("h3", { text: "Synthadoc: Lint report" });
+        const out = contentEl.createEl("div");
+        out.createEl("p", { text: "Loading…", cls: "synthadoc-muted" });
+
+        api.lintReport().then((r: any) => {
+            out.empty();
+            const contradictions: string[] = r.contradictions ?? [];
+            const orphanDetails: Array<{ slug: string; index_suggestion: string }> =
+                r.orphan_details ?? (r.orphans ?? []).map((s: string) => ({ slug: s, index_suggestion: `- [[${s}]]` }));
+
+            if (contradictions.length === 0 && orphanDetails.length === 0) {
+                out.createEl("p", { text: "✅ All clear — no contradictions or orphan pages." });
+                return;
+            }
+
+            if (contradictions.length > 0) {
+                out.createEl("h4", { text: `❌ Contradicted pages (${contradictions.length})` });
+                const ul = out.createEl("ul");
+                contradictions.forEach(slug => {
+                    const li = ul.createEl("li");
+                    li.createEl("code", { text: slug });
+                    li.appendText(" — open the page, resolve the conflict, set status: active");
+                });
+            }
+
+            if (orphanDetails.length > 0) {
+                out.createEl("h4", { text: `🔗 Orphan pages (${orphanDetails.length})` });
+                const ul = out.createEl("ul");
+                orphanDetails.forEach(({ slug, index_suggestion }) => {
+                    const li = ul.createEl("li");
+                    li.createEl("code", { text: slug });
+                    li.appendText(" — no inbound links");
+                    const sug = li.createEl("div");
+                    sug.style.cssText = "font-size:11px;color:var(--text-muted);margin-top:2px";
+                    sug.appendText("Suggested index entry: ");
+                    sug.createEl("code", { text: index_suggestion });
+                });
+            }
+        }).catch(() => {
+            out.empty();
+            out.createEl("p", { text: "Error: is synthadoc serve running?" });
+        });
+    }
+    onClose() { this.contentEl.empty(); }
+}
+
+class IngestUrlModal extends Modal {
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.createEl("h3", { text: "Synthadoc: Ingest from URL" });
+
+        const row = contentEl.createEl("div");
+        row.style.cssText = "display:flex;gap:8px;margin-bottom:12px";
+        const input = row.createEl("input", { type: "url", placeholder: "https://..." });
+        input.style.cssText = "flex:1;padding:4px 8px";
+        const btn = row.createEl("button", { text: "Ingest" });
+
+        const out = contentEl.createEl("p");
+
+        const submit = async () => {
+            const url = input.value.trim();
+            if (!url) return;
+            btn.disabled = true;
+            out.setText("Queuing…");
+            try {
+                const r = await api.ingest(url) as any;
+                out.setText(`Queued — job ${r.job_id}`);
+                new Notice(`Synthadoc: ingest queued (job ${r.job_id})`);
+            } catch {
+                out.setText("Error: is synthadoc serve running?");
+            } finally { btn.disabled = false; }
+        };
+
+        btn.onclick = submit;
+        input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+    }
+    onClose() { this.contentEl.empty(); }
+}
+
+class QueryModal extends Modal {
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.createEl("h3", { text: "Synthadoc: Query your wiki" });
+
+        const row = contentEl.createEl("div");
+        row.style.cssText = "display:flex;gap:8px;margin-bottom:12px";
+        const input = row.createEl("input", { type: "text", placeholder: "Ask a question…" });
+        input.style.cssText = "flex:1;padding:4px 8px";
+        const btn = row.createEl("button", { text: "Ask" });
+
+        const out = contentEl.createEl("div");
+        out.style.cssText = "max-height:60vh;overflow-y:auto;padding:4px 0";
+
+        const submit = async () => {
+            if (!input.value.trim()) return;
+            btn.disabled = true;
+            out.empty();
+            out.createEl("p", { text: "Searching…", cls: "synthadoc-muted" });
+            try {
+                const r = await api.query(input.value) as any;
+                out.empty();
+                await MarkdownRenderer.render(this.app, r.answer, out, "", this);
+                if (r.citations?.length) {
+                    const cite = out.createEl("p");
+                    cite.style.cssText = "font-size:11px;color:var(--text-muted);margin-top:8px";
+                    cite.setText("Sources: " + r.citations.join(", "));
+                }
+            } catch {
+                out.empty();
+                out.createEl("p", { text: "Error: is synthadoc serve running?" });
+            } finally { btn.disabled = false; }
+        };
+
+        btn.onclick = submit;
+        input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+    }
+    onClose() { this.contentEl.empty(); }
+}
