@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: AGPL-3.0-or-later
 // Copyright (C) 2026 Paul Chen / axoviq.com
-import { App, MarkdownRenderer, Modal, Notice, Plugin, PluginSettingTab, Setting, TFile } from "obsidian";
+import { App, MarkdownRenderer, Modal, Notice, Plugin, PluginSettingTab, Setting, SuggestModal, TFile } from "obsidian";
 import { api, setBase } from "./api";
 
 const SUPPORTED_EXTENSIONS = new Set([
@@ -29,11 +29,13 @@ export default class SynthadocPlugin extends Plugin {
         this.addCommand({
             id: "synthadoc-ingest-current",
             name: "Synthadoc: Ingest current file as source",
-            checkCallback: (checking) => {
+            callback: () => {
                 const file = this.app.workspace.getActiveFile();
-                if (!file) return false;
-                if (!checking) this.ingestFile(file);
-                return true;
+                if (file) {
+                    this.ingestFile(file);
+                } else {
+                    new IngestPickerModal(this.app, this).open();
+                }
             },
         });
 
@@ -135,6 +137,36 @@ export default class SynthadocPlugin extends Plugin {
         } else {
             new Notice(`Synthadoc: ${queued} queued, ${failed} failed — is the server running?`);
         }
+    }
+}
+
+class IngestPickerModal extends SuggestModal<TFile> {
+    private plugin: SynthadocPlugin;
+
+    constructor(app: App, plugin: SynthadocPlugin) {
+        super(app);
+        this.plugin = plugin;
+        this.setPlaceholder("Select a source file to ingest…");
+    }
+
+    getSuggestions(query: string): TFile[] {
+        const folder = this.plugin.settings.rawSourcesFolder.replace(/\/$/, "");
+        const q = query.toLowerCase();
+        return this.app.vault.getFiles().filter(f => {
+            if (!f.path.startsWith(folder + "/")) return false;
+            const ext = f.extension?.toLowerCase() ?? "";
+            if (!SUPPORTED_EXTENSIONS.has(ext)) return false;
+            return q ? f.name.toLowerCase().includes(q) : true;
+        });
+    }
+
+    renderSuggestion(file: TFile, el: HTMLElement): void {
+        el.createEl("div", { text: file.name });
+        el.createEl("div", { text: file.path, cls: "synthadoc-muted" }).style.fontSize = "11px";
+    }
+
+    onChooseSuggestion(file: TFile): void {
+        this.plugin.ingestFile(file);
     }
 }
 
