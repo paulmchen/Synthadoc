@@ -261,6 +261,7 @@ Use a **second terminal** for all commands below. All plugin commands are now ac
 | `Synthadoc: Query wiki...` | Opens a query modal with markdown-rendered answer and citations |
 | `Synthadoc: Lint report` | Opens a modal showing contradicted pages and orphans |
 | `Synthadoc: Run lint` | Queues a lint job; shows a notice with contradiction + orphan counts |
+| `Synthadoc: Run lint with auto-resolve` | Same but LLM resolves contradictions automatically when confidence ≥ threshold |
 | `Synthadoc: List jobs...` | Opens a filterable jobs table with per-job result details |
 
 ---

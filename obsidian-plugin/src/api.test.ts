@@ -114,23 +114,31 @@ describe("api.jobs", () => {
 });
 
 describe("api.lint", () => {
-    it("POSTs to /jobs/lint with scope in body", async () => {
+    it("POSTs to /jobs/lint with scope and auto_resolve in body", async () => {
         mockResponse({ contradictions_found: 2, orphans: ["stale"] });
         await api.lint("contradictions");
         expect(mockRequestUrl).toHaveBeenCalledWith(
             expect.objectContaining({
                 url: "http://127.0.0.1:7070/jobs/lint",
                 method: "POST",
-                body: JSON.stringify({ scope: "contradictions" }),
+                body: JSON.stringify({ scope: "contradictions", auto_resolve: false }),
             })
         );
     });
 
-    it("defaults scope to 'all'", async () => {
+    it("defaults scope to 'all' and auto_resolve to false", async () => {
         mockResponse({ contradictions_found: 0, orphans: [] });
         await api.lint();
         expect(mockRequestUrl).toHaveBeenCalledWith(
-            expect.objectContaining({ body: JSON.stringify({ scope: "all" }) })
+            expect.objectContaining({ body: JSON.stringify({ scope: "all", auto_resolve: false }) })
+        );
+    });
+
+    it("passes auto_resolve=true when requested", async () => {
+        mockResponse({ contradictions_found: 0, orphans: [] });
+        await api.lint("all", true);
+        expect(mockRequestUrl).toHaveBeenCalledWith(
+            expect.objectContaining({ body: JSON.stringify({ scope: "all", auto_resolve: true }) })
         );
     });
 });

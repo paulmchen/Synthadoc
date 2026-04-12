@@ -87,6 +87,18 @@ export default class SynthadocPlugin extends Plugin {
             },
         });
 
+        this.addCommand({
+            id: "synthadoc-lint-auto-resolve",
+            name: "Synthadoc: Run lint with auto-resolve",
+            callback: async () => {
+                new Notice("Synthadoc: running lint with auto-resolve...");
+                try {
+                    const r = await api.lint("all", true) as any;
+                    new Notice(`Synthadoc: lint done — ${r.contradictions_found} contradictions, ${r.orphans?.length ?? 0} orphans`);
+                } catch { new Notice("Synthadoc: server not running — run 'synthadoc serve'"); }
+            },
+        });
+
         this.addRibbonIcon("book-open", "Synthadoc status", async () => {
             const [healthRes, statusRes] = await Promise.allSettled([
                 api.health(),

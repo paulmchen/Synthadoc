@@ -27,7 +27,7 @@ export const api = {
     status:      ()                    => call("/status"),
     query:       (question: string)    => call("/query",        "POST", { question }),
     ingest:      (source: string)      => call("/jobs/ingest",  "POST", { source }),
-    lint:        (scope = "all")       => call("/jobs/lint",    "POST", { scope }),
+    lint:        (scope = "all", autoResolve = false) => call("/jobs/lint", "POST", { scope, auto_resolve: autoResolve }),
     lintReport:  ()                    => call("/lint/report"),
     jobs:        (status?: string)     => call(status ? `/jobs?status=${encodeURIComponent(status)}` : "/jobs"),
 };

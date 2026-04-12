@@ -528,6 +528,7 @@ Reload the plugin (toggle off/on) after copying — a full Obsidian restart is n
 | `Synthadoc: Query wiki...` | Responsive modal (min 520px, 60vw, max 860px); markdown-rendered answer with citation footer; stays open when clicking elsewhere — must be closed explicitly via ✕ or Escape |
 | `Synthadoc: Lint report` | Modal showing contradicted pages and orphans with remediation hints |
 | `Synthadoc: Run lint` | Queues a lint job; shows a notice with contradiction + orphan counts when complete |
+| `Synthadoc: Run lint with auto-resolve` | Same as above but passes `auto_resolve: true` — LLM resolves contradictions automatically when confidence ≥ threshold |
 | `Synthadoc: List jobs...` | Modal with status-filter dropdown, results table, error details |
 | `Synthadoc: Web search...` | Modal — type a plain topic, engine prepends `search for:` and enqueues an ingest job; returns job ID |
 

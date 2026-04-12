@@ -266,3 +266,37 @@ describe("SynthadocPlugin.ingestAllSources", () => {
         expect(Notice).toHaveBeenCalledWith(expect.stringContaining("1 queued, 1 failed"));
     });
 });
+
+describe("SynthadocPlugin lint commands", () => {
+    it("Run lint calls api.lint without auto-resolve", async () => {
+        const { api } = await import("./api");
+        (api.lint as any).mockResolvedValueOnce({ contradictions_found: 1, orphans: [] });
+
+        const { default: SynthadocPlugin } = await import("./main");
+        const plugin = new SynthadocPlugin();
+        await plugin.onload();
+
+        const cmd = (plugin.addCommand as any).mock.calls.find(
+            (c: any) => c[0].id === "synthadoc-lint"
+        );
+        await cmd[0].callback();
+
+        expect(api.lint).toHaveBeenCalledWith();
+    });
+
+    it("Run lint with auto-resolve calls api.lint with autoResolve=true", async () => {
+        const { api } = await import("./api");
+        (api.lint as any).mockResolvedValueOnce({ contradictions_found: 0, orphans: [] });
+
+        const { default: SynthadocPlugin } = await import("./main");
+        const plugin = new SynthadocPlugin();
+        await plugin.onload();
+
+        const cmd = (plugin.addCommand as any).mock.calls.find(
+            (c: any) => c[0].id === "synthadoc-lint-auto-resolve"
+        );
+        await cmd[0].callback();
+
+        expect(api.lint).toHaveBeenCalledWith("all", true);
+    });
+});
