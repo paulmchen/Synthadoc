@@ -17,3 +17,6 @@ history-of-computing/
 # synthadoc operational — never commit
 .synthadoc/
 docs/plans/
+
+# diagram sources — export to PNG/SVG and commit the image instead
+*.drawio

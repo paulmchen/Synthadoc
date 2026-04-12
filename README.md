@@ -131,52 +131,7 @@ RAG chunks documents and retrieves them at query time. Synthadoc **compiles** kn
 
 ## Architecture
 
-```mermaid
-flowchart TB
-    subgraph ACCESS["  Access Layer  "]
-        direction LR
-        CLI["CLI\nsynthadoc …"]
-        OBS["Obsidian Plugin"]
-        MCP["Claude MCP\n⚠ optional"]
-    end
-
-    subgraph ENGINE["  Synthadoc Engine  ·  localhost:PORT  "]
-        direction LR
-        API["HTTP REST API"]
-        QUEUE["Job Queue\nSQLite · asyncio · auto-retry"]
-        API --> QUEUE
-    end
-
-    subgraph PROC["  Processing Agents  "]
-        direction LR
-        IA["IngestAgent\n+ SkillAgent\nPDF · URL · Web · Image · DOCX · …"]
-        QA["QueryAgent\nBM25 + LLM synthesis"]
-        LA["LintAgent\nContradiction · Orphan detection"]
-    end
-
-    subgraph OPS["  Admin & Ops  "]
-        direction LR
-        ADMIN["Health check · Install · Uninstall\nAudit · Cost report · Jobs monitor · Cache"]
-    end
-
-    subgraph PROV["  LLM Providers  "]
-        LLM["Anthropic  ·  OpenAI  ·  Gemini  ·  Groq  ·  Ollama"]
-    end
-
-    subgraph STORE["  Storage  "]
-        DB["wiki/*.md  ·  embeddings.db  ·  cache.db  ·  audit.db  ·  jobs.db"]
-    end
-
-    CLI -- HTTP --> API
-    OBS -- HTTP --> API
-    MCP -. "stdio MCP" .-> ENGINE
-
-    QUEUE --> IA & QA & LA
-
-    IA & QA & LA --> PROV
-    IA & QA & LA --> STORE
-    ADMIN -. "HTTP / direct" .-> STORE
-```
+![Synthadoc Architecture](docs/architecture.png)
 
 For full architecture details, data models, API reference, and plugin development guide see **[docs/design.md](docs/design.md)**.
 

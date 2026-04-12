@@ -127,62 +127,10 @@ The filename without extension, derived from the page title. ASCII-safe and CJK-
 
 ### Component Map
 
-```mermaid
-flowchart TB
-    subgraph ACCESS["Access Layer"]
-        CLI["synthadoc CLI\n(thin HTTP client)"]
-        OBS["Obsidian Plugin\n(TypeScript)"]
-        MCP_C["Claude Desktop\n(MCP client — optional)"]
-    end
+![Synthadoc Architecture](architecture.png)
 
-    subgraph INTEGRATION["Integration Layer  ·  http_server.py  ·  mcp_server.py"]
-        HTTP["Synthadoc Engine\nHTTP REST · localhost:PORT\nCORS · 10 MB limit · 60s timeout\nBackground job worker (2s poll)"]
-        MCP["MCP Server\nstdio transport\n6 tools"]
-    end
-
-    subgraph CORE["Core Layer"]
-        ORCH["Orchestrator"]
-        AGENTS["IngestAgent\nQueryAgent\nLintAgent"]
-        INFRA["CostGuard\nJobQueue (SQLite)\nCache (3-layer)\nHooks dispatcher\nScheduler"]
-    end
-
-    subgraph SKILLS["Skill Layer  ·  lazy-loaded"]
-        SA["SkillAgent"]
-        BUILTIN["pdf · url · markdown\ndocx · xlsx · image\nweb_search"]
-        CUSTOM["Custom skills\nwiki/skills/\n~/.synthadoc/skills/"]
-    end
-
-    subgraph PROVIDERS["Provider Layer"]
-        P["Anthropic · OpenAI · Gemini\nGroq · Ollama · Custom"]
-    end
-
-    subgraph STORAGE["Storage Layer"]
-        S["wiki/*.md · audit.db · jobs.db\ncache.db · embeddings.db · logs/"]
-    end
-
-    subgraph ADMIN["Admin & Ops"]
-        OT["OpenTelemetry\ntraces.jsonl / OTLP"]
-        SCHED["OS Scheduler\ncrontab / schtasks"]
-        HOOKS["Hook Scripts\nhooks/*.py"]
-    end
-
-    CLI -- "HTTP REST" --> HTTP
-    OBS -- "HTTP REST" --> HTTP
-    MCP_C -. "MCP stdio (optional)" .-> MCP
-    HTTP --> ORCH
-    MCP --> ORCH
-    ORCH --> AGENTS
-    ORCH --> INFRA
-    AGENTS --> SA
-    SA --> BUILTIN
-    SA --> CUSTOM
-    AGENTS --> P
-    AGENTS --> S
-    INFRA --> S
-    INFRA --> HOOKS
-    INFRA --> SCHED
-    CORE --> OT
-```
+> Diagram source: `docs/architecture.drawio` (draw.io, not tracked in git).
+> To update: open in [draw.io](https://app.diagrams.net), edit, export as PNG to `docs/architecture.png`, commit the PNG.
 
 ### Request lifecycle (ingest via CLI)
 
