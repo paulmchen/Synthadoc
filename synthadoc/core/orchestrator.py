@@ -67,10 +67,15 @@ class Orchestrator:
                 cache=self._cache, max_pages=self._cfg.ingest.max_pages_per_ingest,
             )
             result = await agent.ingest(source, force=force, bust_cache=force)
+            # Fan out web search child sources as individual ingest jobs
+            for child_source in result.child_sources:
+                await self._queue.enqueue("ingest", {"source": child_source, "force": False})
+
             await self._queue.complete(job_id, result={
                 "pages_created": result.pages_created,
                 "pages_updated": result.pages_updated,
                 "pages_flagged": result.pages_flagged,
+                "child_sources_enqueued": len(result.child_sources),
                 "tokens_used": result.tokens_used,
                 "cost_usd": result.cost_usd,
             })

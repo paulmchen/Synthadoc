@@ -1,8 +1,42 @@
 # Synthadoc
 
+```
+      .-+###############+-.
+    .##                   ##.
+   ##    .----.   .----.    ##
+  ##    /######\ /######\    ##
+  ##    |######| |######|    ##
+  ##    | [SD] | | wiki |    ##
+  ##    |######| |######|    ##
+  ##    \######/ \######/    ##
+   ##    '----'   '----'    ##
+    '##                   ##'
+      '-+###############+-'
+
+  S Y N T H A D O C  0.1.0
+  ────────────────────────────────
+  Domain-agnostic LLM wiki engine
+```
+
 **Domain-agnostic LLM knowledge compilation engine.**
 
+> Built for individuals, small teams, and large organizations who need a knowledge base that stays accurate as documents accumulate.
+
 Synthadoc reads your raw source documents — PDFs, spreadsheets, web pages, images, Word files — and uses an LLM to synthesize them into a persistent, structured wiki. Cross-references are built automatically, contradictions are detected and surfaced, orphan pages are flagged, and every answer cites its sources. The result lives as plain Markdown in a local folder that opens directly in [Obsidian](https://obsidian.md).
+
+---
+
+## Who Is It For?
+
+Synthadoc scales from a single researcher to a company-wide knowledge platform:
+
+| Team size | Typical use case |
+|-----------|-----------------|
+| **Solo / 1–2 people** | Personal research wiki, freelance knowledge base, indie hacker documentation — run it free on Gemini Flash or a local Ollama model with zero ongoing cost |
+| **Small team (3–20)** | Shared internal wiki for a startup or department; each member ingests from their own sources; the shared wiki stays consistent and contradiction-free |
+| **Medium / enterprise** | Compliance-sensitive knowledge bases that must stay local; per-department wikis on separate ports; audit trail for every ingest and cost event; hook system for CI/CD integration; OpenTelemetry for ops dashboards |
+
+No cloud account. No vendor lock-in. The wiki is plain Markdown — open it in any editor, back it up with git, sync it with any cloud drive.
 
 ---
 
@@ -22,6 +56,7 @@ Most knowledge-management tools retrieve and summarize at query time. Synthadoc 
 | LLM wiki vs. RAG | Pre-compiled structured knowledge beats query-time synthesis for contradiction detection, graph traversal, and offline access |
 | MCP / CLI / HTTP | Synthadoc IS an MCP server — Claude Desktop can orchestrate it naturally; CLI and HTTP API support every other integration path |
 | Local-first | All data stays on your machine; localhost-only network binding; no cloud dependency except the LLM API itself |
+| Provider choice | Five LLM backends including free-tier Gemini and Groq — no single-vendor dependency |
 
 ---
 
@@ -59,22 +94,36 @@ Every page is a plain Markdown file with YAML frontmatter. No proprietary format
 
 ---
 
-## Feature Comparison
+## Why Synthadoc?
 
-| Feature | Synthadoc | Typical RAG | NotebookLM |
-|---------|-----------|-------------|------------|
-| Ingest-time synthesis | Yes | No | Partial |
-| Contradiction detection | Yes | No | No |
-| Orphan page detection | Yes | No | No |
-| Persistent graph (wikilinks) | Yes | No | No |
-| Local-first (no cloud data) | Yes | Varies | No |
-| Custom file-type plugins | Yes | Limited | No |
-| MCP server built-in | Yes | No | No |
-| Obsidian integration | Yes | No | No |
-| Cost guard + audit | Yes | No | No |
-| Hook system | Yes | No | No |
-| Offline browsable artifact | Yes | No | No |
-| Multi-wiki support | Yes | No | No |
+### Competitive advantages
+
+| Capability | Synthadoc | Typical RAG | NotebookLM | Notion AI |
+|------------|-----------|-------------|------------|-----------|
+| Ingest-time synthesis | **Yes** | No | Partial | No |
+| Contradiction detection | **Yes** | No | No | No |
+| Orphan page detection | **Yes** | No | No | No |
+| Persistent wikilink graph | **Yes** | No | No | No |
+| Local-first (no cloud data) | **Yes** | Varies | No | No |
+| Custom skill plugins | **Yes** | Limited | No | No |
+| MCP server built-in | **Yes** | No | No | No |
+| Obsidian integration | **Yes** | No | No | No |
+| Cost guard + audit trail | **Yes** | No | No | No |
+| Hook / CI integration | **Yes** | No | No | No |
+| Offline browsable artifact | **Yes** | No | No | No |
+| Multi-wiki isolation | **Yes** | No | No | No |
+| Web search → wiki pages | **Yes** | No | No | No |
+| Free LLM tier support | **Yes** (Gemini, Groq) | No | No | No |
+| Auto wiki overview page | **Yes** | No | No | No |
+
+### Key differentiators vs. RAG
+
+RAG chunks documents and retrieves them at query time. Synthadoc **compiles** knowledge: every new source is synthesized into the existing wiki graph at ingest time.
+
+- **Contradictions are caught, not blended.** When two sources disagree, Synthadoc flags the page — RAG silently averages both claims.
+- **Knowledge is linked, not scattered.** `[[wikilinks]]` connect related pages into a navigable graph visible in Obsidian and queryable with Dataview.
+- **The artifact outlives the tool.** Close the server, open the wiki folder in any Markdown editor — the knowledge is all there, human-readable, no proprietary format.
+- **Cost-efficient at scale.** Two-step ingest with cached analysis means repeated ingest of similar sources costs near-zero tokens. Three cache layers stack for lint and query too.
 
 ---
 
@@ -104,7 +153,7 @@ Every page is a plain Markdown file with YAML frontmatter. No proprietary format
           │
           ▼
     LLM Providers
-    (Anthropic / OpenAI / Ollama)
+    (Anthropic / OpenAI / Gemini / Groq / Ollama)
           │
           ▼
     Storage
@@ -117,11 +166,16 @@ For full architecture details, data models, API reference, and plugin developmen
 
 ## What's Included in v0.1
 
-- **3 agents** — IngestAgent (two-pass synthesis), QueryAgent (BM25 + LLM), LintAgent (contradiction + orphan detection + auto-resolution)
-- **7 built-in skills** — PDF, URL, Markdown/TXT, DOCX, XLSX/CSV, Image (vision), Web search (v0.2 stub)
+- **3 agents** — IngestAgent (two-step cached synthesis), QueryAgent (BM25 + LLM), LintAgent (contradiction + orphan detection + auto-resolution)
+- **7 built-in skills** — PDF, URL, Markdown/TXT, DOCX, XLSX/CSV, Image (vision), **Web search (Tavily — fully live)**
 - **Folder-based skill system** — each skill is a self-contained folder with a `SKILL.md` manifest; intent-based dispatch alongside extension matching; drop a folder in `skills/` to add a new format without touching core code
 - **3 access surfaces** — CLI (thin HTTP client), HTTP REST API, MCP server
-- **Obsidian plugin** — ingest (with file picker when no note is active), query (responsive modal, stays open), lint report, jobs list, web search placeholder — all from the command palette; ribbon shows engine health + page count
+- **Obsidian plugin** — ingest (with file picker when no note is active), query (responsive modal, stays open), lint report, jobs list — all from the command palette; ribbon shows engine health + page count
+- **5 LLM providers** — Anthropic, OpenAI, **Gemini** (free tier), **Groq** (free tier), Ollama (local); switch with one config line
+- **Two-step ingest** — `_analyse()` caches entity extraction + summary; decision prompt uses summary instead of full text; reduces cost on large documents
+- **purpose.md scope filtering** — define what belongs in your wiki; the LLM skips out-of-scope sources cleanly
+- **overview.md auto-summary** — 2-paragraph wiki overview regenerated automatically after every ingest that creates or updates pages
+- **Audit CLI** — `synthadoc audit history / cost / events` query `audit.db` without needing `sqlite3`; `--analyse-only` flag previews ingest analysis before writing pages
 - **3-layer cache** — embedding cache, LLM response cache, provider prompt cache
 - **Cost guards** — configurable soft-warn and hard-gate USD thresholds
 - **Hook system** — shell commands on 8 lifecycle events; blocking or background
@@ -138,7 +192,7 @@ For full architecture details, data models, API reference, and plugin developmen
 ### Prerequisites
 
 - Python 3.11+
-- An [Anthropic API key](https://console.anthropic.com/) (or OpenAI / local Ollama)
+- An LLM API key — **Gemini Flash is free** (15 RPM / 1M tokens/day, no credit card): [aistudio.google.com/app/apikey](https://aistudio.google.com/app/apikey). Alternatively: [Anthropic](https://console.anthropic.com/), [OpenAI](https://platform.openai.com/api-keys), [Groq](https://console.groq.com/keys) (free tier), or local [Ollama](https://ollama.com) (no key needed).
 
 ### Install Synthadoc
 
@@ -197,6 +251,13 @@ research = "~/wikis/research"
 work     = "~/wikis/work"
 ```
 
+To switch to Gemini Flash (free tier):
+
+```toml
+[agents]
+default = { provider = "gemini", model = "gemini-2.0-flash" }
+```
+
 ### Per-project config — `<wiki-root>/.synthadoc/config.toml`
 
 ```toml
@@ -209,6 +270,10 @@ hard_gate_usd = 2.00
 
 [ingest]
 max_pages_per_ingest = 15
+
+[web_search]
+provider    = "tavily"
+max_results = 20         # URLs fetched per query; each becomes an ingest job
 
 [logs]
 level        = "INFO"   # DEBUG | INFO | WARNING | ERROR
@@ -341,6 +406,27 @@ synthadoc jobs retry <job-id> -w my-wiki
 synthadoc jobs purge --older-than 30 -w my-wiki
 ```
 
+### Inspecting ingest results
+
+```bash
+# Preview how a source will be analysed without writing pages
+synthadoc ingest report.pdf --analyse-only -w my-wiki
+# → {"entities": [...], "tags": [...], "summary": "..."}
+```
+
+### Audit trail
+
+```bash
+# Last 20 ingest records (source, pages, tokens, cost)
+synthadoc audit history -w my-wiki
+
+# Token spend + cost for last 30 days (or --days N)
+synthadoc audit cost -w my-wiki
+
+# Audit events: contradictions found, auto-resolutions, cost gate triggers
+synthadoc audit events -w my-wiki
+```
+
 ### Searching without LLM
 
 ```bash
@@ -424,11 +510,15 @@ tail -f .synthadoc/logs/synthadoc.log | jq 'select(.job_id == "abc123")'
 ### Audit trail
 
 ```bash
-# Query audit records with sqlite3
+# Ingest history (no sqlite3 needed)
+synthadoc audit history -w my-wiki          # last 20 records
+synthadoc audit cost -w my-wiki             # spend summary, last 30 days
+synthadoc audit cost --days 7 -w my-wiki    # weekly view
+synthadoc audit events -w my-wiki           # contradictions, resolutions, cost gates
+
+# Direct sqlite3 queries for custom analysis
 sqlite3 .synthadoc/audit.db \
   "SELECT source, hash, cost_usd, ingested_at FROM ingest_log ORDER BY ingested_at DESC LIMIT 20"
-
-# Total spend
 sqlite3 .synthadoc/audit.db \
   "SELECT SUM(cost_usd) FROM ingest_log"
 ```
@@ -625,18 +715,18 @@ Edit `<wiki-root>/AGENTS.md` to give the LLM domain-specific instructions — wh
 
 ---
 
-## v0.2 Roadmap
+## What's Coming in v0.2
 
 Target: week of 2026-04-25.
 
 | Feature | Notes |
 |---------|-------|
-| **Web search skill** | Full `WebSearchSkill` implementation — `synthadoc ingest "search for: <query>"` fetches and compiles top results |
-| **Web UI** | Browser-based dashboard; view pages, run jobs, inspect contradictions without Obsidian |
-| **Vector search + re-ranking** | `fastembed` (already an optional dependency); replaces BM25-only with hybrid BM25 + vector |
-| **Graph-aware retrieval** | Multi-hop queries traverse the wikilink graph, not just single-page BM25 hits |
-| **Larger corpus support** | Optimized indexing for hundreds to thousands of pages |
-| **Additional LLM providers** | Gemini, Mistral, and others beyond Anthropic / OpenAI / Ollama |
+| **Web UI** | Browser-based dashboard — view pages, run jobs, inspect contradictions and orphans without Obsidian |
+| **Vector search + re-ranking** | Hybrid BM25 + `fastembed` local vectors; better recall on semantically related queries |
+| **Graph-aware retrieval** | Multi-hop wikilink traversal for queries like "What connects Turing to von Neumann?" |
+| **Larger corpus support** | Sharded index, incremental embedding updates, streaming ingest for very large documents |
+| **Obsidian plugin: web search modal** | Full UI for `search for:` intent queries — type a topic, watch pages appear live |
+| **Mistral + Bedrock providers** | Additional OpenAI-compatible and AWS-native LLM backends |
 
 ---
 

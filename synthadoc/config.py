@@ -103,6 +103,12 @@ class ScheduleConfig:
     jobs: list[ScheduleJob] = field(default_factory=list)
 
 
+@dataclass
+class WebSearchConfig:
+    provider: str = "tavily"
+    max_results: int = 20
+
+
 # ---------------------------------------------------------------------------
 # Root config
 # ---------------------------------------------------------------------------
@@ -117,6 +123,7 @@ class Config:
     logs: LogsConfig = field(default_factory=LogsConfig)
     server: ServerConfig = field(default_factory=ServerConfig)
     schedule: ScheduleConfig = field(default_factory=ScheduleConfig)
+    web_search: WebSearchConfig = field(default_factory=WebSearchConfig)
     hooks: dict = field(default_factory=dict)
     wikis: dict = field(default_factory=dict)
 
@@ -249,6 +256,13 @@ def _raw_to_config(raw: dict, source_has_agents: bool) -> Config:
     jobs = [ScheduleJob(op=j["op"], cron=j["cron"]) for j in jobs_raw]
     schedule = ScheduleConfig(jobs=jobs)
 
+    # --- web_search ---
+    ws = raw.get("web_search", {})
+    web_search = WebSearchConfig(
+        provider=ws.get("provider", "tavily"),
+        max_results=ws.get("max_results", 20),
+    )
+
     # --- hooks ---
     hooks = raw.get("hooks", {})
 
@@ -263,6 +277,7 @@ def _raw_to_config(raw: dict, source_has_agents: bool) -> Config:
         logs=logs,
         server=server,
         schedule=schedule,
+        web_search=web_search,
         hooks=hooks,
         wikis=wikis,
     )
@@ -321,7 +336,8 @@ def load_config(
         return Config(
             agents=AgentsConfig(
                 default=AgentConfig(provider="anthropic", model="claude-opus-4-6")
-            )
+            ),
+            web_search=WebSearchConfig(),
         )
 
     # A global_config was provided — it must define agents.default.

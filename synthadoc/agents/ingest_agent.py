@@ -28,6 +28,7 @@ class IngestResult:
     pages_created: list[str] = field(default_factory=list)
     pages_updated: list[str] = field(default_factory=list)
     pages_flagged: list[str] = field(default_factory=list)
+    child_sources: list[str] = field(default_factory=list)
     tokens_used: int = 0
     cost_usd: float = 0.0
     cache_hits: int = 0
@@ -259,6 +260,11 @@ class IngestAgent:
                     return result
 
         extracted = await self._skill_agent.extract(source)
+
+        # Web search fan-out: return child sources; orchestrator enqueues them as jobs
+        if extracted.metadata.get("child_sources"):
+            result.child_sources = extracted.metadata["child_sources"]
+            return result
 
         # Pass 0: Vision extraction for image files
         if extracted.metadata.get("is_image"):

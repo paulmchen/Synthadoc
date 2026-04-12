@@ -1,6 +1,6 @@
 # Synthadoc — Design Document
 
-**Version:** 0.1  
+**Version:** 0.1 (updated 2026-04-11)  
 **Audience:** Product users who want to understand how the system works; developers adding features, skills, and plugins.
 
 ---
@@ -26,6 +26,7 @@
 17. [Security](#17-security)
 18. [Plugin Development Guide](#18-plugin-development-guide)
 19. [v0.2 Roadmap](#19-v02-roadmap)
+20. [New in v0.1 — Feature Reference](#20-new-in-v01--feature-reference)
 
 ---
 
@@ -168,7 +169,7 @@ The filename without extension, derived from the page title. ASCII-safe and CJK-
 ┌──────────────────────▼───────────────────────────────────────────┐
 │  Provider layer                                                  │
 │                                                                  │
-│  Anthropic (claude-opus-4-6)  OpenAI  Ollama  Custom             │
+│  Anthropic  OpenAI  Gemini  Groq  Ollama  Custom             │
 └──────────────────────┬───────────────────────────────────────────┘
                        │
 ┌──────────────────────▼───────────────────────────────────────────┐
@@ -186,10 +187,10 @@ The filename without extension, derived from the page title. ASCII-safe and CJK-
 4. Background worker picks up job within 2 seconds
 5. Orchestrator instantiates IngestAgent, checks CostGuard
 6. SkillAgent detects `.pdf`, lazy-loads `PdfSkill`, extracts text
-7. IngestAgent Pass 1: entity extraction → candidate page list
-8. IngestAgent Pass 2: BM25 search → candidate pages loaded
-9. IngestAgent Pass 3: LLM decides per-page action (create / update / flag / skip)
-10. IngestAgent Pass 4: writes pages, fires hooks
+7. IngestAgent Step 1 — Analysis: `_analyse()` extracts entities, tags, and a 3-sentence summary (cached under key `analyse-v1`)
+8. IngestAgent Step 2 — Decision: LLM reads the summary (not raw text) + BM25-retrieved candidate pages + `purpose.md` scope, decides per-page action (`create` / `update` / `skip` / `flag_contradiction`)
+9. IngestAgent Step 3 — Write: applies actions; updates frontmatter; writes `[[wikilinks]]`; fires hooks
+10. IngestAgent Step 4 — Overview: if any pages were created or updated, regenerates `wiki/overview.md`
 11. Job transitions to `completed`; `log.md` updated; `audit.db` record written
 
 ---
@@ -202,14 +203,23 @@ All agents are async Python classes. They receive a job context, write results t
 
 **File:** `synthadoc/agents/ingest_agent.py`
 
-Four-pass pipeline:
+Two-step pipeline (replaces the original four-pass design):
 
-| Pass | Model | Purpose |
+| Step | Model | Purpose |
 |------|-------|---------|
-| 1 — Entity extraction | Fast (e.g. haiku) | Extract concepts, entities, tags from raw text. Zero wiki reads. |
-| 2 — Candidate search | None (BM25) | Find existing pages related to extracted entities |
-| 3 — LLM decision | Default | Review candidates + source text. Output per-page action: `create`, `update`, `flag_contradiction`, `skip` |
-| 4 — Write | None | Apply actions; update frontmatter; write `[[wikilinks]]`; fire hooks |
+| 1 — Analysis (`_analyse()`) | Default | Extract entities, tags, and a 3-sentence summary from raw text. Result cached under key `analyse-v1` keyed by SHA-256 of the text. |
+| — Candidate search | None (BM25) | Find existing wiki pages related to extracted entities |
+| 2 — Decision | Default | LLM reads summary (not full text) + BM25 candidates + `purpose.md` scope. Outputs per-page action: `create`, `update`, `flag_contradiction`, `skip` |
+| — Write | None | Apply actions; update frontmatter; write `[[wikilinks]]`; fire hooks |
+| — Overview | Default | Regenerate `wiki/overview.md` if any pages were created or updated |
+
+**Analysis caching:** The analysis step is expensive (full text read + LLM call). Results are cached in `cache.db` by text SHA-256. Subsequent ingests of the same source (e.g. after a `--force` that hits the decision cache miss) re-use the analysis result without a new LLM call.
+
+**purpose.md scope filtering:** IngestAgent reads `wiki/purpose.md` at init. Its content is prepended to the decision prompt. The LLM can respond with `action="skip"` when the source is clearly outside the wiki's stated scope. If `purpose.md` is absent, all sources are accepted.
+
+**overview.md auto-maintenance:** After any ingest that creates or updates pages, IngestAgent calls `_update_overview()`, which reads the 10 most-recently-modified wiki pages and asks the LLM to write a 2-paragraph overview of the entire wiki. The result is saved to `wiki/overview.md` with `status: auto` frontmatter. This page is excluded from contradiction detection and orphan checks.
+
+**Web search fan-out:** When a source is routed to the `web_search` skill, `ExtractedContent.metadata["child_sources"]` contains the top result URLs. IngestAgent detects this and returns early with the URL list; the Orchestrator enqueues each URL as a separate ingest job. This keeps the web search skill stateless and the queue the single source of work.
 
 **Deduplication:** Every source tracked by SHA-256 in `audit.db`. Hash match → skip. Use `--force` to bypass.
 
@@ -327,7 +337,7 @@ This means importing 20 skills costs essentially zero memory until they are need
 | `docx` | `.docx` | `word document`, `docx` | python-docx |
 | `xlsx` | `.xlsx`, `.csv` | `spreadsheet`, `excel`, `csv` | openpyxl |
 | `image` | `.png`, `.jpg`, `.jpeg`, `.webp`, `.gif`, `.tiff` | `image`, `screenshot`, `diagram`, `photo` | Base64 + vision LLM |
-| `web_search` | _(none)_ | `search for`, `find on the web`, `look up`, `web search`, `browse` | **v0.2 stub** — job set to `failed` immediately, no retry |
+| `web_search` | _(none)_ | `search for`, `find on the web`, `look up`, `web search`, `browse` | Calls Tavily API; returns top result URLs as child sources enqueued individually. Requires `TAVILY_API_KEY`. |
 
 ### Custom Skill Locations
 
@@ -603,7 +613,7 @@ synthadoc
 ├── uninstall <name>
 ├── demo list
 ├── serve [-w wiki] [--port N] [--mcp-only] [--http-only] [--verbose]
-├── ingest <source> [-w wiki] [--batch] [--file manifest] [--force]
+├── ingest <source> [-w wiki] [--batch] [--file manifest] [--force] [--analyse-only]
 ├── query "<question>" [-w wiki] [--save]
 ├── lint
 │   ├── run [-w wiki] [--scope contradictions|orphans|all] [--since date] [--auto-resolve]
@@ -614,6 +624,10 @@ synthadoc
 │   ├── retry <id> [-w wiki]
 │   ├── delete <id> [-w wiki]
 │   └── purge --older-than <days> [-w wiki]
+├── audit
+│   ├── history [-w wiki] [--limit N]   — recent ingest records from audit.db
+│   ├── cost [-w wiki] [--days N]       — token spend and cost summary
+│   └── events [-w wiki] [--limit N]    — audit events (contradictions, resolutions, cost gates)
 ├── search "<terms>" [-w wiki]
 ├── status [-w wiki]
 ├── cache clear [-w wiki]
@@ -622,6 +636,31 @@ synthadoc
     ├── list [-w wiki]
     ├── remove <id> [-w wiki]
     └── apply [-w wiki]
+```
+
+### `ingest --analyse-only`
+
+Runs the analysis step only (entity extraction + tagging + summary) and prints the JSON result without writing any wiki pages. Useful for previewing how a source will be interpreted before committing it to the wiki:
+
+```bash
+synthadoc ingest report.pdf --analyse-only -w my-wiki
+# → {"entities": ["Alan Turing", "Enigma"], "tags": ["cryptography"], "summary": "…"}
+```
+
+### `audit` sub-commands
+
+Query the append-only `audit.db` directly from the CLI:
+
+```bash
+# Last 20 ingest records
+synthadoc audit history -w my-wiki
+
+# Token spend + cost for the last 30 days (default) or custom window
+synthadoc audit cost -w my-wiki
+synthadoc audit cost --days 7 -w my-wiki
+
+# Last 100 audit events (contradictions found, auto-resolutions, cost gate triggers)
+synthadoc audit events -w my-wiki
 ```
 
 ### Wiki targeting
@@ -664,6 +703,26 @@ exporter      = "file"                    # or "otlp"
 otlp_endpoint = "http://localhost:4317"   # used when exporter = "otlp"
 ```
 
+### Provider switching
+
+All five supported providers (`anthropic`, `openai`, `gemini`, `groq`, `ollama`) share the same config key. Gemini and Groq use OpenAI-compatible endpoints internally, so no custom provider class is needed — just set the provider name and supply the corresponding API key:
+
+```toml
+# Switch from Claude to Gemini Flash (free tier available)
+[agents]
+default = { provider = "gemini", model = "gemini-2.0-flash" }
+```
+
+Required environment variables per provider:
+
+| Provider | Env var | Free tier |
+|----------|---------|-----------|
+| `anthropic` | `ANTHROPIC_API_KEY` | No (pay-per-token) |
+| `openai` | `OPENAI_API_KEY` | No (pay-per-token) |
+| `gemini` | `GEMINI_API_KEY` | **Yes** — 15 RPM / 1M tokens/day on Flash |
+| `groq` | `GROQ_API_KEY` | **Yes** — generous free tier on Llama/Mixtral models |
+| `ollama` | _(none)_ | **Yes** — fully local |
+
 ### Per-project config — `<wiki-root>/.synthadoc/config.toml`
 
 ```toml
@@ -699,6 +758,10 @@ backup_count = 5
 on_ingest_complete     = "python hooks/auto_commit.py"
 on_contradiction_found = { cmd = "python hooks/notify.py", blocking = true }
 
+[web_search]
+provider    = "tavily"   # only supported provider
+max_results = 20         # URLs returned per query; each enqueued as an ingest job
+
 [[schedule.jobs]]
 op   = "ingest --batch raw_sources/"
 cron = "0 2 * * *"
@@ -712,7 +775,7 @@ cron = "0 3 * * 0"
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| `agents.default.provider` | str | `"anthropic"` | LLM provider: `anthropic`, `openai`, `ollama` |
+| `agents.default.provider` | str | `"anthropic"` | LLM provider: `anthropic`, `openai`, `gemini`, `groq`, `ollama` |
 | `agents.default.model` | str | `"claude-opus-4-6"` | Model ID |
 | `server.port` | int | `7070` | HTTP listen port |
 | `queue.max_parallel_ingest` | int | `4` | Max concurrent ingest agents |
@@ -727,6 +790,8 @@ cron = "0 3 * * 0"
 | `logs.level` | str | `"INFO"` | Console log level |
 | `logs.max_file_mb` | int | `5` | Rotate `synthadoc.log` at this size |
 | `logs.backup_count` | int | `5` | Rotated files to keep |
+| `web_search.provider` | str | `"tavily"` | Web search provider (currently only `tavily` supported) |
+| `web_search.max_results` | int | `20` | Maximum results fetched per web search query |
 
 ---
 
@@ -1077,11 +1142,15 @@ class SlackExportSkill(BaseSkill):
 
 ### Writing a provider
 
+Built-in providers: `anthropic`, `openai`, `gemini`, `groq`, `ollama`. For any provider that exposes an OpenAI-compatible API, no custom class is needed — the built-in `openai` provider with a custom `base_url` is sufficient.
+
+For a fully proprietary API, subclass `LLMProvider`:
+
 ```python
 # SPDX-License-Identifier: MIT
 from synthadoc.providers.base import LLMProvider, Message, CompletionResponse
 
-class GeminiProvider(LLMProvider):
+class MyProvider(LLMProvider):
 
     async def complete(
         self,
@@ -1090,7 +1159,7 @@ class GeminiProvider(LLMProvider):
         temperature: float = 0.0,
         **kwargs,
     ) -> CompletionResponse:
-        # Call Gemini API …
+        # Call your API …
         return CompletionResponse(
             content="…",
             usage={"input_tokens": N, "output_tokens": M},
@@ -1101,7 +1170,7 @@ Place in `~/.synthadoc/providers/` or the wiki `providers/` directory. Reference
 
 ```toml
 [agents]
-default = { provider = "gemini", model = "gemini-2.0-flash" }
+default = { provider = "my_provider", model = "my-model-id" }
 ```
 
 ### Writing a hook
@@ -1121,13 +1190,45 @@ echo "Event $event fired on wiki $wiki" | mail -s "Synthadoc notification" you@e
 
 ## 19. v0.2 Roadmap
 
-Planned for release the week of 2026-04-25.
+Target: week of 2026-04-25.
 
 | Feature | Motivation |
 |---------|-----------|
-| **Web search ingest** | `web_search` skill fully implemented — `synthadoc ingest "search for: <query>"` fetches top results and compiles them into wiki pages |
 | **Web UI** | Browser-based dashboard — pages, jobs, contradictions, orphans — without requiring Obsidian |
 | **Vector search + re-ranking** | Hybrid BM25 + `fastembed` local vectors; better recall on semantically related queries; `fastembed` already an optional dependency |
 | **Graph-aware retrieval** | Traverse wikilink adjacency for multi-hop queries (e.g. "What connects Turing to von Neumann?") |
 | **Larger corpus support** | Sharded BM25 index; incremental embedding updates; streaming ingest for very large documents |
-| **Additional LLM providers** | Gemini, Mistral, Bedrock — beyond Anthropic, OpenAI, Ollama |
+| **Mistral + Bedrock providers** | Additional OpenAI-compatible endpoints; Bedrock for AWS-native deployments |
+| **Obsidian plugin: web search modal** | Full UI for `search for:` intent — type a query, pick results, watch pages appear live |
+
+---
+
+## 20. New in v0.1 — Feature Reference
+
+These features were added to v0.1 after the original scope was set.
+
+### Two-step ingest with cached analysis
+
+The original four-pass pipeline is replaced by a two-step design. Step 1 (`_analyse()`) extracts entities, tags, and a 3-sentence summary and caches the result in `cache.db`. Step 2 (decision) reads the **summary** instead of the full text, which reduces prompt size and LLM cost on large documents. The cache key is `sha256(text)` + operation `"analyse-v1"` — repeat ingests of the same source hit the cache at both steps.
+
+The `POST /analyse` HTTP endpoint and `--analyse-only` CLI flag expose Step 1 standalone for debugging and source preview.
+
+### purpose.md scope filtering
+
+`wiki/purpose.md` lets you define what belongs in the wiki. IngestAgent reads it at init and prepends its content to the decision prompt. The LLM can respond `action="skip"` for out-of-scope sources without creating a failed job — the result is a clean skip with a `skip_reason` field in the job result. Create `purpose.md` via `synthadoc install` (template auto-generated) or write it manually.
+
+### overview.md auto-maintenance
+
+`wiki/overview.md` is a 2-paragraph LLM-generated summary of the entire wiki, regenerated automatically after any ingest that creates or updates pages. It reads the 10 most-recently-modified pages for context. The page carries `status: auto` frontmatter and is excluded from contradiction detection and orphan checks.
+
+### Tavily web search skill
+
+`web_search` skill is fully implemented (no longer a stub). Trigger with any intent phrase: `search for:`, `find on the web:`, `look up`, `browse`. The skill calls the Tavily search API and returns top result URLs as `child_sources`. The Orchestrator enqueues each URL as a separate ingest job. `max_results` (default 20) is configurable in `[web_search]` config. Requires `TAVILY_API_KEY` (free tier: 1,000 searches/month at tavily.com).
+
+### Multi-provider LLM support
+
+Five providers supported: `anthropic`, `openai`, `gemini`, `groq`, `ollama`. Gemini and Groq use the existing `OpenAIProvider` with a `base_url` override — no new provider class. Switch by changing one line in config and setting the corresponding API key. Gemini Flash and several Groq-hosted models have free tiers suitable for personal and small-team use.
+
+### Audit CLI commands
+
+`synthadoc audit history / cost / events` query `audit.db` directly without needing `sqlite3`. See [Section 10 — CLI](#10-cli) for full usage.

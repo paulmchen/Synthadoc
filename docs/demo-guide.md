@@ -59,7 +59,7 @@ automatically.
 | `docx` | `.docx` extension · phrases: `word document`, `docx` | python-docx paragraph extraction |
 | `xlsx` | `.xlsx` / `.csv` extension · phrases: `spreadsheet`, `excel`, `csv` | openpyxl + stdlib csv |
 | `image` | `.png` `.jpg` `.jpeg` `.webp` `.gif` `.tiff` · phrases: `image`, `screenshot`, `diagram`, `photo` | Base64 → vision LLM |
-| `web_search` *(v2)* | Intent phrases only: `search for`, `find on the web`, `look up`, `web search`, `browse` | No file extension — purely intent-driven. Calls a search API and fetches top results. **v1 stub — full implementation in v2.** |
+| `web_search` | Intent phrases only: `search for`, `find on the web`, `look up`, `web search`, `browse` | No file extension — purely intent-driven. Calls Tavily API; fans out top result URLs as individual ingest jobs. Requires `TAVILY_API_KEY`. |
 
 **Custom skills:** drop a folder containing `SKILL.md` + `scripts/main.py` into
 `<wiki-root>/skills/` and the engine picks it up on next start — no install or restart
@@ -150,25 +150,63 @@ until Obsidian is restarted.
 
 ---
 
-### Set your Anthropic API key
+### Set your API key
 
-Ingest and query both call the Anthropic API — set your key before starting the server.
+Synthadoc supports five LLM providers. The demo uses Anthropic by default, but **Gemini Flash is a great free-tier alternative** — 15 requests per minute and 1 million tokens per day at no cost, which is more than enough for demos and personal wikis.
 
-**Windows — current session only (cmd.exe):**
+#### Option A — Anthropic (Claude)
+
+Get a key at console.anthropic.com — pay-per-token, no free tier.
+
+**Windows (cmd.exe):**
 ```cmd
 set ANTHROPIC_API_KEY=sk-ant-your-key-here
 ```
-
-**Windows — permanent (PowerShell, survives terminal restarts):**
+**Windows (PowerShell, permanent):**
 ```powershell
 [System.Environment]::SetEnvironmentVariable("ANTHROPIC_API_KEY", "sk-ant-your-key-here", "User")
 ```
-Close and reopen any terminals after running this.
-
 **Linux / macOS:**
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-your-key-here"
 ```
+
+#### Option B — Google Gemini (free tier)
+
+1. Go to **aistudio.google.com/app/apikey** → create a key (free, no credit card)
+2. Set the key:
+
+**Windows (cmd.exe):**
+```cmd
+set GEMINI_API_KEY=your-gemini-key-here
+```
+**Linux / macOS:**
+```bash
+export GEMINI_API_KEY="your-gemini-key-here"
+```
+
+3. Update the wiki config to use Gemini:
+
+Open `<wiki-root>/.synthadoc/config.toml` (create it if absent) and add:
+
+```toml
+[agents]
+default = { provider = "gemini", model = "gemini-2.0-flash" }
+```
+
+Restart `synthadoc serve` after changing the config.
+
+#### Switching providers mid-demo
+
+You can switch at any time by changing the `provider` line in `.synthadoc/config.toml` and restarting the server. The wiki, cache, and audit trail are provider-agnostic — switching providers does not require re-ingesting anything.
+
+| Provider | Key env var | Free tier |
+|----------|-------------|-----------|
+| `anthropic` | `ANTHROPIC_API_KEY` | No |
+| `openai` | `OPENAI_API_KEY` | No |
+| `gemini` | `GEMINI_API_KEY` | Yes (15 RPM, 1M tok/day) |
+| `groq` | `GROQ_API_KEY` | Yes (Llama/Mixtral models) |
+| `ollama` | _(none)_ | Yes (fully local) |
 
 ---
 
@@ -462,16 +500,13 @@ You can also ingest from Obsidian: open any note → command palette (`Ctrl/Cmd+
 
 ---
 
-### Step 10 — Web search ingestion *(v2 preview)*
+### Step 10 — Web search ingestion
 
-> **Status:** The `web_search` skill is a v2 stub. Running these commands today returns a
-> `NotImplementedError` with a clear message. This step shows the intended UX so you can
-> plan ahead — all commands and intent phrases are final.
+> **Requires:** `TAVILY_API_KEY` — get a free key (1,000 searches/month) at **tavily.com**.
+> Set it before starting the server: `set TAVILY_API_KEY=tvly-your-key-here` (Windows)
+> or `export TAVILY_API_KEY="tvly-your-key-here"` (Linux/macOS).
 
-Unlike every other skill, `web_search` has **no file extension**. It is selected purely by
-recognising an intent phrase in the source string — no `--skill` flag needed. The engine
-reads the phrase, routes to `web_search`, calls the configured search API, fetches and
-cleans the top results, and hands the text to the ingest pipeline exactly like a PDF or URL.
+The `web_search` skill is fully live in v0.1. Unlike every other skill, it has **no file extension** — it is selected by recognising an intent phrase in the source string. The engine calls the Tavily search API, gets the top result URLs (up to 20), and enqueues each URL as a separate ingest job. Pages are created for each result that passes scope filtering.
 
 **Trigger phrases** (any of these in the source string activates the skill):
 
@@ -491,9 +526,13 @@ synthadoc ingest "find on the web: Linus Torvalds Linux kernel creation 1991" -w
 synthadoc ingest "search for: ENIAC first general purpose electronic computer history" -w history-of-computing
 ```
 
-Each command routes to `web_search`, queries the configured search provider for the top
-results, and feeds the extracted text into the ingest pipeline. Pages such as
-`dennis-ritchie`, `linux-kernel-history`, and `eniac` would be created or enriched.
+Each command fans out to up to 20 URL ingest jobs. Watch them process:
+
+```
+synthadoc jobs list -w history-of-computing
+```
+
+Pages such as `dennis-ritchie`, `linux-kernel-history`, and `eniac` will be created or enriched. The `wiki/overview.md` page is regenerated automatically after each batch completes.
 
 **Batch web search using a manifest file:**
 
@@ -513,19 +552,71 @@ Then ingest the whole file at once:
 synthadoc ingest --file raw_sources/web-searches.txt -w history-of-computing
 ```
 
-Each line is dispatched as a separate ingest job. Watch progress:
+**Preview before committing** — use `--analyse-only` to see how a source will be interpreted without writing pages:
 
 ```
-synthadoc jobs list -w history-of-computing
+synthadoc ingest "search for: quantum computing IBM Google" --analyse-only -w history-of-computing
+# → {"entities": ["IBM", "Google", "quantum computing"], "tags": [...], "summary": "..."}
 ```
 
-**Via Obsidian plugin:** command palette (`Ctrl/Cmd+P`) →
-`Synthadoc: Ingest from URL...` — the same input field accepts intent strings.
-Type `search for: Linus Torvalds Linux kernel creation 1991` and press **Ingest**.
+**Via Obsidian plugin:** command palette → `Synthadoc: Ingest from URL...` — the same input accepts intent strings. Type `search for: Linus Torvalds Linux kernel creation 1991` and press **Ingest**.
 
 ---
 
-### Step 11 — Control Synthadoc from Claude (MCP)
+### Step 11 — Audit commands
+
+The `synthadoc audit` commands query the append-only `audit.db` without needing `sqlite3`. Use them to review what was ingested, how much it cost, and what events occurred.
+
+**Ingest history** — last 20 source records:
+
+```
+synthadoc audit history -w history-of-computing
+```
+
+Expected output:
+```
+Source                                    Pages created  Pages updated  Tokens   Cost
+----------------------------------------  -------------  -------------  -------  ------
+raw_sources/turing-enigma-decryption.pdf  alan-turing                   4820     $0.031
+raw_sources/computing-pioneers-timeline…  ibm-history    alan-turing    6210     $0.040
+raw_sources/first-compiler-controversy…               grace-hopper     3950     $0.025
+raw_sources/quantum-computing-primer.p…  quantum-computing              5100     $0.033
+```
+
+**Cost summary** — token spend for the last 30 days:
+
+```
+synthadoc audit cost -w history-of-computing
+```
+
+Expected output:
+```
+Period: last 30 days
+Total tokens : 20,080
+Total cost   : $0.129
+Sources processed: 4
+Avg cost/source  : $0.032
+```
+
+Pass `--days 7` for a weekly view.
+
+**Audit events** — contradiction detections, auto-resolutions, cost gate triggers:
+
+```
+synthadoc audit events -w history-of-computing
+```
+
+Expected output:
+```
+2026-04-11 14:35  contradiction_found   grace-hopper ← first-compiler-controversy.pdf
+2026-04-11 14:37  auto_resolved         grace-hopper (confidence: 0.91)
+```
+
+These three commands replace the need to run raw `sqlite3` queries and are safe to run while the server is active.
+
+---
+
+### Step 12 — Control Synthadoc from Claude (MCP)
 
 Synthadoc exposes an MCP server so Claude Desktop (or any MCP-capable Claude surface) can drive
 the wiki in natural language — no CLI required.
@@ -622,7 +713,7 @@ if the Obsidian Claude plugin is active.
 
 ---
 
-#### Use case E — Expand the wiki via web search *(v2 preview)*
+#### Use case E — Expand the wiki via web search
 
 After reviewing the wiki, tell Claude:
 
@@ -646,7 +737,7 @@ new page back into `index.md`.
 
 ---
 
-### Step 12 — Uninstall
+### Step 13 — Uninstall
 
 ```
 synthadoc uninstall history-of-computing
