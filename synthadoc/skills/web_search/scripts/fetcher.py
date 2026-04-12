@@ -1,3 +1,11 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Paul Chen / axoviq.com
-# Placeholder — HTTP fetch + HTML cleaning helper for web_search (v2)
+"""Tavily search client wrapper for web_search skill."""
+from __future__ import annotations
+
+
+async def search_tavily(query: str, max_results: int, api_key: str) -> dict:
+    """Call Tavily search API and return raw response dict."""
+    from tavily import AsyncTavilyClient
+    client = AsyncTavilyClient(api_key=api_key)
+    return await client.search(query, max_results=max_results)

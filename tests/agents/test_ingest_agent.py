@@ -313,3 +313,208 @@ async def test_ingest_hash_size_mismatch_warns_and_proceeds(tmp_wiki, mock_provi
     assert not result.skipped
     assert any("collision" in r.message.lower() or "size" in r.message.lower()
                for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_purpose_md_filters_out_of_scope_source(tmp_wiki, mock_provider):
+    """When purpose.md is present and LLM returns action=skip, result is skipped."""
+    import itertools
+    from synthadoc.providers.base import CompletionResponse
+
+    (tmp_wiki / "wiki" / "purpose.md").write_text(
+        "This wiki covers AI and machine learning only.", encoding="utf-8")
+
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    log = LogWriter(tmp_wiki / "wiki" / "log.md")
+    audit = AuditDB(tmp_wiki / ".synthadoc" / "audit.db")
+    await audit.init()
+    cache = CacheManager(tmp_wiki / ".synthadoc" / "cache.db")
+    await cache.init()
+
+    source = tmp_wiki / "raw_sources" / "cooking.md"
+    source.write_text("# Pasta Recipes\nHow to make carbonara.", encoding="utf-8")
+
+    entity_resp = CompletionResponse(
+        text='{"entities":["pasta"],"concepts":["cooking"],"tags":["food"]}',
+        input_tokens=50, output_tokens=20)
+    skip_resp = CompletionResponse(
+        text='{"reasoning":"Out of scope","action":"skip","target":"","new_slug":"","update_content":""}',
+        input_tokens=50, output_tokens=20)
+    mock_provider.complete.side_effect = itertools.cycle([entity_resp, skip_resp])
+
+    agent = IngestAgent(provider=mock_provider, store=store, search=search,
+                        log_writer=log, audit_db=audit, cache=cache, max_pages=15,
+                        wiki_root=tmp_wiki)
+    result = await agent.ingest(str(source))
+    assert result.skipped
+    assert "scope" in result.skip_reason.lower()
+
+
+@pytest.mark.asyncio
+async def test_purpose_md_absent_does_not_break_ingest(tmp_wiki, mock_provider):
+    """No purpose.md — ingest proceeds normally."""
+    assert not (tmp_wiki / "wiki" / "purpose.md").exists()
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    log = LogWriter(tmp_wiki / "wiki" / "log.md")
+    audit = AuditDB(tmp_wiki / ".synthadoc" / "audit.db")
+    await audit.init()
+    cache = CacheManager(tmp_wiki / ".synthadoc" / "cache.db")
+    await cache.init()
+    source = tmp_wiki / "raw_sources" / "test.md"
+    source.write_text("# AI Safety\nAlignment research.", encoding="utf-8")
+    agent = IngestAgent(provider=mock_provider, store=store, search=search,
+                        log_writer=log, audit_db=audit, cache=cache,
+                        max_pages=15, wiki_root=tmp_wiki)
+    result = await agent.ingest(str(source))
+    assert not result.skipped
+
+
+def test_init_wiki_creates_purpose_md(tmp_path):
+    from synthadoc.cli._init import init_wiki
+    init_wiki(tmp_path, domain="AI Research")
+    purpose = tmp_path / "wiki" / "purpose.md"
+    assert purpose.exists()
+    text = purpose.read_text(encoding="utf-8")
+    assert "AI Research" in text
+
+
+@pytest.mark.asyncio
+async def test_overview_md_created_after_ingest(tmp_wiki):
+    """overview.md must be written after a successful page creation."""
+    import itertools
+    from synthadoc.providers.base import CompletionResponse
+    from unittest.mock import AsyncMock
+
+    provider = AsyncMock()
+    entity_resp = CompletionResponse(
+        text='{"entities":["AI"],"tags":["ml"],"summary":"AI safety research.","relevant":true}',
+        input_tokens=50, output_tokens=20)
+    decision_resp = CompletionResponse(
+        text='{"reasoning":"New topic","action":"create","target":"","new_slug":"ai-safety","update_content":""}',
+        input_tokens=50, output_tokens=20)
+    overview_resp = CompletionResponse(
+        text="This wiki covers AI safety research.\n\nKey themes include alignment.",
+        input_tokens=50, output_tokens=30)
+    provider.complete = AsyncMock(side_effect=itertools.cycle(
+        [entity_resp, decision_resp, overview_resp]))
+
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    log = LogWriter(tmp_wiki / "wiki" / "log.md")
+    audit = AuditDB(tmp_wiki / ".synthadoc" / "audit.db")
+    await audit.init()
+    cache = CacheManager(tmp_wiki / ".synthadoc" / "cache.db")
+    await cache.init()
+
+    source = tmp_wiki / "raw_sources" / "ai.md"
+    source.write_text("# AI Safety\nAlignment is important.", encoding="utf-8")
+
+    agent = IngestAgent(provider=provider, store=store, search=search,
+                        log_writer=log, audit_db=audit, cache=cache,
+                        max_pages=15, wiki_root=tmp_wiki)
+    result = await agent.ingest(str(source))
+    assert result.pages_created
+    overview = tmp_wiki / "wiki" / "overview.md"
+    assert overview.exists(), "overview.md should be created after page creation"
+    text = overview.read_text(encoding="utf-8")
+    assert "overview" in text.lower() or "wiki" in text.lower()
+
+
+@pytest.mark.asyncio
+async def test_overview_md_not_written_on_skip(tmp_wiki):
+    """overview.md must NOT be written when ingest is skipped."""
+    import itertools
+    from synthadoc.providers.base import CompletionResponse
+    from unittest.mock import AsyncMock
+
+    provider = AsyncMock()
+    entity_resp = CompletionResponse(
+        text='{"entities":[],"tags":[],"summary":"Out of scope.","relevant":false}',
+        input_tokens=10, output_tokens=5)
+    skip_resp = CompletionResponse(
+        text='{"action":"skip","target":"","new_slug":"","update_content":""}',
+        input_tokens=10, output_tokens=5)
+    provider.complete = AsyncMock(side_effect=itertools.cycle([entity_resp, skip_resp]))
+
+    (tmp_wiki / "wiki" / "purpose.md").write_text("AI only.", encoding="utf-8")
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    log = LogWriter(tmp_wiki / "wiki" / "log.md")
+    audit = AuditDB(tmp_wiki / ".synthadoc" / "audit.db")
+    await audit.init()
+    cache = CacheManager(tmp_wiki / ".synthadoc" / "cache.db")
+    await cache.init()
+
+    source = tmp_wiki / "raw_sources" / "cooking.md"
+    source.write_text("# Pasta\nHow to cook.", encoding="utf-8")
+
+    agent = IngestAgent(provider=provider, store=store, search=search,
+                        log_writer=log, audit_db=audit, cache=cache,
+                        max_pages=15, wiki_root=tmp_wiki)
+    await agent.ingest(str(source))
+    assert not (tmp_wiki / "wiki" / "overview.md").exists()
+
+
+@pytest.mark.asyncio
+async def test_analyse_returns_structured_result(tmp_wiki):
+    """_analyse() returns entities, tags, and a summary string."""
+    from synthadoc.providers.base import CompletionResponse
+    from unittest.mock import AsyncMock
+
+    provider = AsyncMock()
+    provider.complete = AsyncMock(return_value=CompletionResponse(
+        text='{"entities":["AI"],"tags":["ml"],"summary":"This source discusses AI safety.","relevant":true}',
+        input_tokens=50, output_tokens=20))
+
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    log = LogWriter(tmp_wiki / "wiki" / "log.md")
+    audit = AuditDB(tmp_wiki / ".synthadoc" / "audit.db")
+    await audit.init()
+    cache = CacheManager(tmp_wiki / ".synthadoc" / "cache.db")
+    await cache.init()
+
+    agent = IngestAgent(provider=provider, store=store, search=search,
+                        log_writer=log, audit_db=audit, cache=cache,
+                        max_pages=15, wiki_root=tmp_wiki)
+    result = await agent._analyse("AI safety content here", bust_cache=True)
+    assert "entities" in result
+    assert "summary" in result
+    assert isinstance(result["summary"], str)
+
+
+@pytest.mark.asyncio
+async def test_analyse_is_cached_on_second_call(tmp_wiki):
+    """Second call with same text must hit cache with 0 additional LLM calls."""
+    from synthadoc.providers.base import CompletionResponse
+    from unittest.mock import AsyncMock
+
+    call_count = 0
+
+    async def counting_complete(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return CompletionResponse(
+            text='{"entities":["X"],"tags":[],"summary":"Test.","relevant":true}',
+            input_tokens=10, output_tokens=5)
+
+    provider = AsyncMock()
+    provider.complete = AsyncMock(side_effect=counting_complete)
+
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    log = LogWriter(tmp_wiki / "wiki" / "log.md")
+    audit = AuditDB(tmp_wiki / ".synthadoc" / "audit.db")
+    await audit.init()
+    cache = CacheManager(tmp_wiki / ".synthadoc" / "cache.db")
+    await cache.init()
+
+    agent = IngestAgent(provider=provider, store=store, search=search,
+                        log_writer=log, audit_db=audit, cache=cache,
+                        max_pages=15, wiki_root=tmp_wiki)
+    await agent._analyse("some text", bust_cache=False)
+    first_calls = call_count
+    await agent._analyse("some text", bust_cache=False)
+    assert call_count == first_calls  # second call hits cache

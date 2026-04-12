@@ -1,4 +1,12 @@
 {
-  "_comment": "Search provider configuration — v2 feature, not yet active",
-  "providers": []
+  "_comment": "Search provider configuration",
+  "providers": [
+    {
+      "name": "tavily",
+      "api_key_env": "TAVILY_API_KEY",
+      "free_tier": true,
+      "free_limit": "1000 searches/month",
+      "signup_url": "https://tavily.com"
+    }
+  ]
 }

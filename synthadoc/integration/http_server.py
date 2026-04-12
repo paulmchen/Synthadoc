@@ -51,6 +51,17 @@ class LintRequest(BaseModel):
     auto_resolve: bool = False
 
 
+class AnalyseRequest(BaseModel):
+    source: str
+
+    @field_validator("source")
+    @classmethod
+    def source_not_empty(cls, v):
+        if not v.strip():
+            raise ValueError("source must not be empty")
+        return v
+
+
 async def _worker_loop(orch) -> None:
     """Background task: poll jobs.db and execute pending jobs."""
     from synthadoc.core.queue import JobStatus
@@ -107,6 +118,7 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
             f"  ---------------------------------\n"
             f"  GET  /health          liveness probe\n"
             f"  GET  /status          wiki stats\n"
+            f"  POST /analyse         analyse source without writing pages\n"
             f"  POST /jobs/ingest     enqueue ingest job\n"
             f"  POST /jobs/lint       enqueue lint job\n"
             f"  GET  /jobs            list jobs\n"
@@ -143,6 +155,27 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
     async def query_post(req: QueryRequest):
         result = await app.state.orch.query(req.question)
         return {"answer": result.answer, "citations": result.citations}
+
+    @app.post("/analyse")
+    async def analyse_source(req: AnalyseRequest):
+        """Run analysis pass on a source and return structured result without writing pages."""
+        from synthadoc.agents.ingest_agent import IngestAgent
+        from synthadoc.providers import make_provider
+        from synthadoc.skills.skill_agent import SkillAgent
+        orch = app.state.orch
+        agent = IngestAgent(
+            provider=make_provider("ingest", orch._cfg),
+            store=orch._store, search=orch._search,
+            log_writer=orch._log, audit_db=orch._audit,
+            cache=orch._cache, max_pages=orch._cfg.ingest.max_pages_per_ingest,
+            wiki_root=orch._root,
+        )
+        skill = SkillAgent()
+        extracted = await skill.extract(req.source)
+        text = extracted.text[:8000]
+        analysis = await agent._analyse(text, bust_cache=False)
+        analysis.pop("_tokens", None)
+        return {"source": req.source, "analysis": analysis}
 
     @app.post("/jobs/ingest")
     async def enqueue_ingest(req: IngestRequest):

@@ -114,6 +114,11 @@ def serve_cmd(
         _require_env("ANTHROPIC_API_KEY", "Anthropic", "https://console.anthropic.com/")
     elif provider == "openai":
         _require_env("OPENAI_API_KEY", "OpenAI", "https://platform.openai.com/api-keys")
+    elif provider == "gemini":
+        _require_env("GEMINI_API_KEY", "Google Gemini",
+                     "https://aistudio.google.com/app/apikey")
+    elif provider == "groq":
+        _require_env("GROQ_API_KEY", "Groq", "https://console.groq.com/keys")
 
     if not mcp_only:
         _check_port(effective_port)

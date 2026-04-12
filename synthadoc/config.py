@@ -17,7 +17,7 @@ from typing import Optional
 # Known providers
 # ---------------------------------------------------------------------------
 
-KNOWN_PROVIDERS = {"anthropic", "openai", "ollama"}
+KNOWN_PROVIDERS = {"anthropic", "openai", "ollama", "gemini", "groq"}
 
 
 # ---------------------------------------------------------------------------
@@ -29,6 +29,7 @@ KNOWN_PROVIDERS = {"anthropic", "openai", "ollama"}
 class AgentConfig:
     provider: str
     model: str
+    base_url: str = ""
 
 
 @dataclass

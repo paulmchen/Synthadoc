@@ -9,7 +9,10 @@ from synthadoc.providers.base import CompletionResponse, LLMProvider, Message
 
 class OpenAIProvider(LLMProvider):
     def __init__(self, api_key: str, config: AgentConfig) -> None:
-        self._client = AsyncOpenAI(api_key=api_key)
+        kwargs: dict = {"api_key": api_key}
+        if config.base_url:
+            kwargs["base_url"] = config.base_url
+        self._client = AsyncOpenAI(**kwargs)
         self._config = config
 
     async def complete(self, messages: list[Message], system: Optional[str] = None,

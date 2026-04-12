@@ -35,6 +35,13 @@ class IngestResult:
     skip_reason: str = ""
 
 
+_ANALYSIS_PROMPT = (
+    "Analyse the source text below. Return ONLY valid JSON with no markdown fences:\n"
+    '{"entities": [...], "tags": [...], "summary": "One to three sentences describing '
+    'the main topic, key claims, and relevance.", "relevant": true}\n\n'
+    "Keep entities and tags under 10 items each.\n\n"
+)
+
 _ENTITY_PROMPT = (
     "Extract key entities, concepts, and tags from the text below.\n"
     "Return ONLY valid JSON: {\"entities\": [...], \"concepts\": [...], \"tags\": [...]}\n"
@@ -60,6 +67,15 @@ _DECISION_PROMPT = (
     "Existing wiki pages (top matches):\n{pages}\n\n"
     "New source:\n{summary}\n\n"
     "Detected entities: {entities}"
+)
+
+_OVERVIEW_PROMPT = (
+    "Write a 2-paragraph overview of a knowledge wiki based on the page titles and "
+    "excerpts below.\n"
+    "First paragraph: what topics this wiki covers.\n"
+    "Second paragraph: key themes and concepts found.\n"
+    "Keep it under 200 words. Plain text only — no markdown headings.\n\n"
+    "Pages:\n{pages}"
 )
 
 _VISION_PROMPT = (
@@ -119,6 +135,69 @@ class IngestAgent:
         self._max_pages = max_pages
         self._wiki_root = Path(wiki_root) if wiki_root is not None else None
         self._skill_agent = SkillAgent()
+        self._purpose = self._load_purpose()
+
+    async def _analyse(self, text: str, bust_cache: bool = False) -> dict:
+        """Step 1 — analysis pass: entity extraction + summary. Cached by content hash."""
+        text_hash = hashlib.sha256(text.encode()).hexdigest()
+        ck = make_cache_key("analyse-v1", {"text_hash": text_hash})
+        if not bust_cache:
+            cached = await self._cache.get(ck)
+            if cached:
+                return cached
+        resp = await self._provider.complete(
+            messages=[Message(role="user", content=f"{_ANALYSIS_PROMPT}{text[:3000]}")],
+            temperature=0.0,
+        )
+        data = _parse_json_response(resp.text)
+        data.setdefault("entities", [])
+        data.setdefault("tags", [])
+        data.setdefault("summary", text[:200])
+        data.setdefault("relevant", True)
+        data["_tokens"] = resp.total_tokens
+        await self._cache.set(ck, data)
+        return data
+
+    async def _update_overview(self) -> None:
+        """Regenerate wiki/overview.md from the 10 most-recently-modified pages."""
+        if self._wiki_root is None:
+            return
+        wiki_dir = self._wiki_root / "wiki"
+        pages = sorted(
+            [p for p in wiki_dir.glob("*.md")
+             if p.stem not in {"overview", "index", "dashboard", "log"}],
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )[:10]
+        if not pages:
+            return
+        page_ctx = []
+        for p in pages:
+            snippet = p.read_text(encoding="utf-8")[:200].replace("\n", " ")
+            page_ctx.append(f"- {p.stem}: {snippet}")
+        pages_str = "\n".join(page_ctx)
+        resp = await self._provider.complete(
+            messages=[Message(role="user",
+                              content=_OVERVIEW_PROMPT.format(pages=pages_str))],
+            temperature=0.3,
+            max_tokens=512,
+        )
+        from datetime import date as _date
+        content = (
+            f"---\ntitle: Wiki Overview\nstatus: auto\n"
+            f"updated: {_date.today().isoformat()}\n---\n\n"
+            f"# Wiki Overview\n\n{resp.text.strip()}\n"
+        )
+        (wiki_dir / "overview.md").write_text(content, encoding="utf-8", newline="\n")
+
+    def _load_purpose(self) -> str:
+        """Load wiki/purpose.md for scope filtering. Returns '' if absent."""
+        if self._wiki_root is None:
+            return ""
+        p = self._wiki_root / "wiki" / "purpose.md"
+        if not p.exists():
+            return ""
+        return p.read_text(encoding="utf-8")[:500]
 
     def _hash(self, path: str) -> tuple[str, int]:
         data = Path(path).read_bytes()
@@ -199,24 +278,13 @@ class IngestAgent:
         else:
             text = extracted.text[:8000]
 
-        # Pass 1: entity extraction (cached by full-content hash)
-        text_hash = hashlib.sha256(text.encode()).hexdigest()
-        ck = make_cache_key("extract-entities", {"text_hash": text_hash})
-        cached = None if bust_cache else await self._cache.get(ck)
-        if cached:
-            result.cache_hits += 1
-            entity_data = cached
-        else:
-            resp = await self._provider.complete(
-                messages=[Message(role="user", content=f"{_ENTITY_PROMPT}{text[:2000]}")],
-                temperature=0.0,
-            )
-            result.tokens_used += resp.total_tokens
-            entity_data = _parse_json_response(resp.text)
-            await self._cache.set(ck, entity_data)
+        # Step 1: analysis pass (cached separately from decision)
+        analysis = await self._analyse(text, bust_cache=bust_cache)
+        result.tokens_used += analysis.pop("_tokens", 0)
 
-        entities = entity_data.get("entities", [])
-        tags = entity_data.get("tags", [])
+        entities = analysis.get("entities", [])
+        tags = analysis.get("tags", [])
+        summary = analysis.get("summary", text[:1500])
 
         # Fallback: if LLM entity extraction returned nothing, extract key phrases
         # directly from the source text so BM25 always has meaningful search terms.
@@ -243,18 +311,26 @@ class IngestAgent:
                 pages_ctx.append(f"[{r.slug}]: {snippet}")
         pages_str = "\n".join(pages_ctx) or "none"
 
-        # Pass 3: decision (cached by text hash + candidate slugs)
+        # Pass 3: decision (cached by summary hash + candidate slugs)
         slugs = [r.slug for r in candidates]
-        ck2 = make_cache_key("make-decision", {"text_hash": text_hash, "slugs": slugs})
+        summary_hash = hashlib.sha256(summary.encode()).hexdigest()
+        ck2 = make_cache_key("make-decision", {"text_hash": summary_hash, "slugs": slugs})
         cached2 = None if bust_cache else await self._cache.get(ck2)
         if cached2:
             result.cache_hits += 1
             decisions = cached2
         else:
+            decision_prompt = _DECISION_PROMPT
+            if self._purpose:
+                purpose_block = (
+                    f"Wiki scope (from purpose.md):\n{self._purpose}\n\n"
+                    "If the source is clearly outside this scope, respond with action=\"skip\".\n\n"
+                )
+                decision_prompt = purpose_block + _DECISION_PROMPT
             resp2 = await self._provider.complete(
-                messages=[Message(role="user", content=_DECISION_PROMPT.format(
+                messages=[Message(role="user", content=decision_prompt.format(
                     pages=pages_str,
-                    summary=text[:1500],
+                    summary=summary,
                     entities=entities,
                 ))],
                 temperature=0.0,
@@ -265,6 +341,11 @@ class IngestAgent:
 
         # Pass 4: writes based on action
         action = decisions.get("action", "create")
+
+        if action == "skip":
+            result.skipped = True
+            result.skip_reason = "out of scope (purpose.md)"
+            return result
         target = decisions.get("target", "")
         new_slug = decisions.get("new_slug") or ""
         update_content = decisions.get("update_content", "")
@@ -320,6 +401,9 @@ class IngestAgent:
                     result.pages_created.append(slug)
                     # New pages are orphans until manually linked — no auto-append to index.md.
                     # The dashboard.md "Orphan pages" Dataview table surfaces them for review.
+
+        if result.pages_created or result.pages_updated:
+            await self._update_overview()
 
         self._log.log_ingest(source=p.name,
                              pages_created=result.pages_created,
