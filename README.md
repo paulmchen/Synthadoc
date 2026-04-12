@@ -679,6 +679,44 @@ class NotionSkill(BaseSkill):
 
 3. Drop the file in the skills directory. Synthadoc hot-loads it on the next ingest — no restart needed.
 
+**Intent-based dispatch** — skills can also be triggered by a text prefix instead of (or alongside) a file extension. Declare the prefix in the `triggers.intents` list in your `SKILL.md`:
+
+```yaml
+# skills/my_search/SKILL.md
+---
+name: my_search
+version: "1.0"
+description: "Web search with localised intent prefixes"
+entry:
+  script: scripts/main.py
+  class: MySearchSkill
+triggers:
+  intents:
+    - "搜索:"
+    - "查找:"
+    - "网络搜索:"
+---
+```
+
+Strip the prefix in your `extract()` method:
+
+```python
+import re
+_INTENT_RE = re.compile(r"^(搜索|查找|网络搜索):?\s*", re.UNICODE)
+
+async def extract(self, source: str) -> ExtractedContent:
+    query = _INTENT_RE.sub("", source).strip() or source
+    # … call your search API with query …
+```
+
+Then ingest with the Chinese prefix:
+
+```bash
+synthadoc ingest "搜索: 量子计算" -w my-wiki
+```
+
+Intent matching is a plain substring check — any Unicode text works. Localized prefixes in Chinese, Japanese, Arabic, etc. are fully supported.
+
 To bundle resource files (prompt templates, lookup tables):
 
 ```
