@@ -2,7 +2,7 @@
 # Copyright (C) 2026 Paul Chen / axoviq.com
 from __future__ import annotations
 import os
-from synthadoc.config import Config
+from synthadoc.config import Config, AgentConfig
 from synthadoc.providers.base import LLMProvider
 
 
@@ -43,6 +43,23 @@ def make_provider(agent_name: str, config: Config) -> LLMProvider:
         from synthadoc.providers.openai import OpenAIProvider
         key = _require_env("OPENAI_API_KEY", "OpenAI", "https://platform.openai.com/api-keys")
         return OpenAIProvider(api_key=key, config=agent_cfg)
+    if name == "gemini":
+        from synthadoc.providers.openai import OpenAIProvider
+        key = _require_env("GEMINI_API_KEY", "Google Gemini",
+                           "https://aistudio.google.com/app/apikey")
+        cfg_with_url = AgentConfig(
+            provider="gemini", model=agent_cfg.model,
+            base_url="https://generativelanguage.googleapis.com/v1beta/openai/",
+        )
+        return OpenAIProvider(api_key=key, config=cfg_with_url)
+    if name == "groq":
+        from synthadoc.providers.openai import OpenAIProvider
+        key = _require_env("GROQ_API_KEY", "Groq", "https://console.groq.com/keys")
+        cfg_with_url = AgentConfig(
+            provider="groq", model=agent_cfg.model,
+            base_url="https://api.groq.com/openai/v1",
+        )
+        return OpenAIProvider(api_key=key, config=cfg_with_url)
     if name == "ollama":
         from synthadoc.providers.ollama import OllamaProvider
         return OllamaProvider(config=agent_cfg)

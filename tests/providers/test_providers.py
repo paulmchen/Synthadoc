@@ -107,3 +107,60 @@ def test_make_provider_ollama_requires_no_key(monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     provider = make_provider("ingest", _make_cfg("ollama", "llama3"))
     assert isinstance(provider, OllamaProvider)
+
+
+def test_make_provider_missing_gemini_key_exits(monkeypatch):
+    from synthadoc.providers import make_provider
+    monkeypatch.setenv("GEMINI_API_KEY", "")
+    with pytest.raises(SystemExit) as exc_info:
+        make_provider("ingest", _make_cfg("gemini", "gemini-2.0-flash"))
+    assert "GEMINI_API_KEY" in str(exc_info.value)
+    assert "aistudio.google.com" in str(exc_info.value)
+
+
+def test_make_provider_missing_groq_key_exits(monkeypatch):
+    from synthadoc.providers import make_provider
+    monkeypatch.setenv("GROQ_API_KEY", "")
+    with pytest.raises(SystemExit) as exc_info:
+        make_provider("ingest", _make_cfg("groq", "llama-3.3-70b-versatile"))
+    assert "GROQ_API_KEY" in str(exc_info.value)
+    assert "console.groq.com" in str(exc_info.value)
+
+
+def test_make_provider_gemini_uses_openai_provider_with_base_url(monkeypatch):
+    from synthadoc.providers import make_provider
+    from synthadoc.providers.openai import OpenAIProvider
+    monkeypatch.setenv("GEMINI_API_KEY", "test-gemini-key")
+    provider = make_provider("ingest", _make_cfg("gemini", "gemini-2.0-flash"))
+    assert isinstance(provider, OpenAIProvider)
+    assert "generativelanguage" in str(provider._client.base_url)
+
+
+def test_make_provider_groq_uses_openai_provider_with_base_url(monkeypatch):
+    from synthadoc.providers import make_provider
+    from synthadoc.providers.openai import OpenAIProvider
+    monkeypatch.setenv("GROQ_API_KEY", "test-groq-key")
+    provider = make_provider("ingest", _make_cfg("groq", "llama-3.3-70b-versatile"))
+    assert isinstance(provider, OpenAIProvider)
+    assert "groq" in str(provider._client.base_url)
+
+
+def test_unknown_provider_raises_value_error():
+    from synthadoc.providers import make_provider
+    with pytest.raises((ValueError, SystemExit)):
+        make_provider("ingest", _make_cfg("unknown_llm", "some-model"))
+
+
+def test_config_rejects_unknown_provider():
+    import tempfile, os
+    from synthadoc.config import load_config
+    from pathlib import Path
+    toml_content = b'[agents.default]\nprovider = "bad_provider"\nmodel = "x"\n'
+    with tempfile.NamedTemporaryFile(suffix=".toml", delete=False) as f:
+        f.write(toml_content)
+        path = Path(f.name)
+    try:
+        with pytest.raises(ValueError, match="Unknown provider"):
+            load_config(project_config=path)
+    finally:
+        os.unlink(path)
