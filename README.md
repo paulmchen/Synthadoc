@@ -379,7 +379,7 @@ Full config reference: [docs/design.md — Configuration](docs/design.md#configu
 synthadoc install my-wiki --target ~/wikis/my-wiki
 
 # Install the demo (includes pre-built pages and raw sources)
-synthadoc install history --target ~/wikis/history --demo
+synthadoc install history-of-computing --target ~/wikis/history-of-computing --demo
 
 # List available demo templates
 synthadoc demo list
