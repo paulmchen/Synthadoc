@@ -378,3 +378,66 @@ def test_init_wiki_creates_purpose_md(tmp_path):
     assert purpose.exists()
     text = purpose.read_text(encoding="utf-8")
     assert "AI Research" in text
+
+
+@pytest.mark.asyncio
+async def test_analyse_returns_structured_result(tmp_wiki):
+    """_analyse() returns entities, tags, and a summary string."""
+    from synthadoc.providers.base import CompletionResponse
+    from unittest.mock import AsyncMock
+
+    provider = AsyncMock()
+    provider.complete = AsyncMock(return_value=CompletionResponse(
+        text='{"entities":["AI"],"tags":["ml"],"summary":"This source discusses AI safety.","relevant":true}',
+        input_tokens=50, output_tokens=20))
+
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    log = LogWriter(tmp_wiki / "wiki" / "log.md")
+    audit = AuditDB(tmp_wiki / ".synthadoc" / "audit.db")
+    await audit.init()
+    cache = CacheManager(tmp_wiki / ".synthadoc" / "cache.db")
+    await cache.init()
+
+    agent = IngestAgent(provider=provider, store=store, search=search,
+                        log_writer=log, audit_db=audit, cache=cache,
+                        max_pages=15, wiki_root=tmp_wiki)
+    result = await agent._analyse("AI safety content here", bust_cache=True)
+    assert "entities" in result
+    assert "summary" in result
+    assert isinstance(result["summary"], str)
+
+
+@pytest.mark.asyncio
+async def test_analyse_is_cached_on_second_call(tmp_wiki):
+    """Second call with same text must hit cache with 0 additional LLM calls."""
+    from synthadoc.providers.base import CompletionResponse
+    from unittest.mock import AsyncMock
+
+    call_count = 0
+
+    async def counting_complete(*args, **kwargs):
+        nonlocal call_count
+        call_count += 1
+        return CompletionResponse(
+            text='{"entities":["X"],"tags":[],"summary":"Test.","relevant":true}',
+            input_tokens=10, output_tokens=5)
+
+    provider = AsyncMock()
+    provider.complete = AsyncMock(side_effect=counting_complete)
+
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    log = LogWriter(tmp_wiki / "wiki" / "log.md")
+    audit = AuditDB(tmp_wiki / ".synthadoc" / "audit.db")
+    await audit.init()
+    cache = CacheManager(tmp_wiki / ".synthadoc" / "cache.db")
+    await cache.init()
+
+    agent = IngestAgent(provider=provider, store=store, search=search,
+                        log_writer=log, audit_db=audit, cache=cache,
+                        max_pages=15, wiki_root=tmp_wiki)
+    await agent._analyse("some text", bust_cache=False)
+    first_calls = call_count
+    await agent._analyse("some text", bust_cache=False)
+    assert call_count == first_calls  # second call hits cache

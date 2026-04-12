@@ -35,6 +35,13 @@ class IngestResult:
     skip_reason: str = ""
 
 
+_ANALYSIS_PROMPT = (
+    "Analyse the source text below. Return ONLY valid JSON with no markdown fences:\n"
+    '{"entities": [...], "tags": [...], "summary": "One to three sentences describing '
+    'the main topic, key claims, and relevance.", "relevant": true}\n\n'
+    "Keep entities and tags under 10 items each.\n\n"
+)
+
 _ENTITY_PROMPT = (
     "Extract key entities, concepts, and tags from the text below.\n"
     "Return ONLY valid JSON: {\"entities\": [...], \"concepts\": [...], \"tags\": [...]}\n"
@@ -120,6 +127,27 @@ class IngestAgent:
         self._wiki_root = Path(wiki_root) if wiki_root is not None else None
         self._skill_agent = SkillAgent()
         self._purpose = self._load_purpose()
+
+    async def _analyse(self, text: str, bust_cache: bool = False) -> dict:
+        """Step 1 — analysis pass: entity extraction + summary. Cached by content hash."""
+        text_hash = hashlib.sha256(text.encode()).hexdigest()
+        ck = make_cache_key("analyse-v1", {"text_hash": text_hash})
+        if not bust_cache:
+            cached = await self._cache.get(ck)
+            if cached:
+                return cached
+        resp = await self._provider.complete(
+            messages=[Message(role="user", content=f"{_ANALYSIS_PROMPT}{text[:3000]}")],
+            temperature=0.0,
+        )
+        data = _parse_json_response(resp.text)
+        data.setdefault("entities", [])
+        data.setdefault("tags", [])
+        data.setdefault("summary", text[:200])
+        data.setdefault("relevant", True)
+        data["_tokens"] = resp.total_tokens
+        await self._cache.set(ck, data)
+        return data
 
     def _load_purpose(self) -> str:
         """Load wiki/purpose.md for scope filtering. Returns '' if absent."""
@@ -209,24 +237,13 @@ class IngestAgent:
         else:
             text = extracted.text[:8000]
 
-        # Pass 1: entity extraction (cached by full-content hash)
-        text_hash = hashlib.sha256(text.encode()).hexdigest()
-        ck = make_cache_key("extract-entities", {"text_hash": text_hash})
-        cached = None if bust_cache else await self._cache.get(ck)
-        if cached:
-            result.cache_hits += 1
-            entity_data = cached
-        else:
-            resp = await self._provider.complete(
-                messages=[Message(role="user", content=f"{_ENTITY_PROMPT}{text[:2000]}")],
-                temperature=0.0,
-            )
-            result.tokens_used += resp.total_tokens
-            entity_data = _parse_json_response(resp.text)
-            await self._cache.set(ck, entity_data)
+        # Step 1: analysis pass (cached separately from decision)
+        analysis = await self._analyse(text, bust_cache=bust_cache)
+        result.tokens_used += analysis.pop("_tokens", 0)
 
-        entities = entity_data.get("entities", [])
-        tags = entity_data.get("tags", [])
+        entities = analysis.get("entities", [])
+        tags = analysis.get("tags", [])
+        summary = analysis.get("summary", text[:1500])
 
         # Fallback: if LLM entity extraction returned nothing, extract key phrases
         # directly from the source text so BM25 always has meaningful search terms.
@@ -253,9 +270,10 @@ class IngestAgent:
                 pages_ctx.append(f"[{r.slug}]: {snippet}")
         pages_str = "\n".join(pages_ctx) or "none"
 
-        # Pass 3: decision (cached by text hash + candidate slugs)
+        # Pass 3: decision (cached by summary hash + candidate slugs)
         slugs = [r.slug for r in candidates]
-        ck2 = make_cache_key("make-decision", {"text_hash": text_hash, "slugs": slugs})
+        summary_hash = hashlib.sha256(summary.encode()).hexdigest()
+        ck2 = make_cache_key("make-decision", {"text_hash": summary_hash, "slugs": slugs})
         cached2 = None if bust_cache else await self._cache.get(ck2)
         if cached2:
             result.cache_hits += 1
@@ -271,7 +289,7 @@ class IngestAgent:
             resp2 = await self._provider.complete(
                 messages=[Message(role="user", content=decision_prompt.format(
                     pages=pages_str,
-                    summary=text[:1500],
+                    summary=summary,
                     entities=entities,
                 ))],
                 temperature=0.0,

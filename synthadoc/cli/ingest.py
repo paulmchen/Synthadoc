@@ -21,6 +21,8 @@ def ingest_cmd(
     file: Optional[str] = typer.Option(None, "--file", help="Manifest file of paths"),
     force: bool = typer.Option(False, "--force", help="Bypass dedup"),
     wiki: str = typer.Option(".", "--wiki", "-w"),
+    analyse_only: bool = typer.Option(False, "--analyse-only",
+        help="Run analysis pass only; print result without writing wiki pages."),
 ):
     """Enqueue a source for ingestion. Requires synthadoc serve to be running."""
     sources = []
@@ -50,6 +52,11 @@ def ingest_cmd(
 
     for s in sources:
         abs_source = str(Path(s).resolve())
+        if analyse_only:
+            import json as _json
+            result = post(wiki, "/analyse", {"source": abs_source})
+            typer.echo(_json.dumps(result, indent=2))
+            continue
         result = post(wiki, "/jobs/ingest", {"source": abs_source, "force": force})
         typer.echo(f"Enqueued {s} → job {result['job_id']}")
         typer.echo(f"Check status: synthadoc jobs status {result['job_id']} -w {wiki}")
