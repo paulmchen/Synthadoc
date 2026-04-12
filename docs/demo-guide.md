@@ -804,7 +804,83 @@ how the wiki evolved over time.
 
 ---
 
-### Step 14 — Uninstall
+### Step 14 — Scheduler: nightly auto-ingest
+
+Hooks react to events that already happened. The scheduler goes the other
+direction — it proactively triggers operations on a timer, so the wiki
+stays fresh without any manual intervention.
+
+**Use case:** as you drop new PDFs, articles, or notes into `raw_sources/`
+during the day, a nightly ingest job picks them all up automatically overnight.
+
+#### Register a nightly ingest
+
+```bash
+synthadoc schedule add \
+  --op "ingest --batch raw_sources/" \
+  --cron "0 2 * * *" \
+  -w history-of-computing
+```
+
+Expected output:
+```
+Scheduled: sched-a3f1b2c4
+```
+
+Synthadoc registers the job directly with the OS scheduler — `crontab` on
+macOS/Linux, Task Scheduler (`schtasks`) on Windows. No background daemon
+is needed; the OS owns the timer.
+
+#### Verify it was registered
+
+```bash
+synthadoc schedule list -w history-of-computing
+```
+
+Expected output:
+```
+sched-a3f1b2c4  0 2 * * *  ingest --batch raw_sources/ -w history-of-computing
+```
+
+#### Add a weekly lint pass
+
+```bash
+synthadoc schedule add \
+  --op "lint run" \
+  --cron "0 3 * * 0" \
+  -w history-of-computing
+```
+
+This registers a Sunday 3 am lint run — contradictions and orphans caught
+every week automatically.
+
+```bash
+synthadoc schedule list -w history-of-computing
+```
+
+Expected output:
+```
+sched-a3f1b2c4  0 2 * * *  ingest --batch raw_sources/ -w history-of-computing
+sched-b7e9d012  0 3 * * 0  lint run -w history-of-computing
+```
+
+#### Clean up (demo only)
+
+Remove the scheduled jobs so they do not run after the demo:
+
+```bash
+synthadoc schedule remove sched-a3f1b2c4 -w history-of-computing
+synthadoc schedule remove sched-b7e9d012 -w history-of-computing
+```
+
+> **Note:** the server must be running when a scheduled job fires. For
+> production use, run `synthadoc serve` as a background service (systemd,
+> launchd, or Windows Service) so it is always available when the OS
+> triggers the schedule.
+
+---
+
+### Step 15 — Uninstall
 
 ```
 synthadoc uninstall history-of-computing
