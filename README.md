@@ -688,6 +688,19 @@ SQLite, append-only. Records: every ingest (source path, SHA-256, cost, timestam
 
 ### Adding a custom skill (new file format)
 
+Skills tell Synthadoc how to extract text from a source it doesn't understand out of the box. Add one when you have a proprietary or domain-specific format:
+
+| You have | Skill you'd write |
+|----------|------------------|
+| Notion workspace export (`.zip`) | Unzip, walk pages, strip Notion-specific markup |
+| Confluence space export (`.xml`) | Parse XML, extract page bodies and metadata |
+| Slack export archive | Walk channels/messages JSON, format as conversation transcript |
+| Internal `.docx` template with custom fields | Strip template boilerplate, extract only the filled-in sections |
+| API endpoint or internal database | Fetch records, render as structured Markdown |
+| Proprietary binary format (CAD, ERP data) | Convert to text using a vendor SDK, return plain content |
+
+Skills are Apache-2.0 licensed — no AGPL obligation on your own skill code.
+
 1. Create `<wiki-root>/skills/my_format.py` (or `~/.synthadoc/skills/` for global availability).
 2. Subclass `BaseSkill` (Apache-2.0 licensed — no AGPL obligation on your skill):
 
