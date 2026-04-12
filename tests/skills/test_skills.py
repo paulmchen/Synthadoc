@@ -390,6 +390,18 @@ async def test_pptx_skill_empty_presentation(tmp_path):
     assert result.metadata["slides"] == 0
 
 
+@pytest.mark.asyncio
+async def test_pptx_skill_invalid_file_raises_descriptive_error(tmp_path):
+    """PptxSkill raises a clear ValueError for corrupt or non-PPTX files."""
+    from synthadoc.skills.pptx.scripts.main import PptxSkill
+
+    bad = tmp_path / "bad.pptx"
+    bad.write_bytes(b"this is not a zip file")
+
+    with pytest.raises(ValueError, match="Cannot read.*PowerPoint"):
+        await PptxSkill().extract(str(bad))
+
+
 def test_pptx_detected_by_intent():
     """Intent keywords route to pptx skill."""
     from synthadoc.agents.skill_agent import SkillAgent

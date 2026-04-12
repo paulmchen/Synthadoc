@@ -9,7 +9,13 @@ class PptxSkill(BaseSkill):
                      extensions=[".pptx"])
 
     async def extract(self, source: str) -> ExtractedContent:
-        prs = Presentation(source)
+        try:
+            prs = Presentation(source)
+        except Exception as exc:
+            raise ValueError(
+                f"Cannot read '{source}' as a PowerPoint file: {exc}. "
+                "Ensure the file is a valid .pptx (Office Open XML) document."
+            ) from exc
         sections: list[str] = []
 
         for i, slide in enumerate(prs.slides, start=1):
