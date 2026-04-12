@@ -306,6 +306,8 @@ Each answer cites `[[wikilinks]]` pointing to the source pages.
 You can also query from Obsidian: open the command palette (`Ctrl/Cmd+P`) →
 `Synthadoc: Query wiki...` → type your question → press **Ask**.
 
+![Synthadoc query result in Obsidian](synthadoc-query-result.png)
+
 ---
 
 ### Step 3 — Batch ingest all demo sources
