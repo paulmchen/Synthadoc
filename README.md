@@ -804,7 +804,7 @@ Target: week of 2026-04-25.
 | **Vector search + re-ranking** | Hybrid BM25 + `fastembed` local vectors; better recall on semantically related queries |
 | **Graph-aware retrieval** | Multi-hop wikilink traversal for queries like "What connects Turing to von Neumann?" |
 | **Larger corpus support** | Sharded index, incremental embedding updates, streaming ingest for very large documents |
-| **Obsidian plugin: web search modal** | Full UI for `search for:` intent queries — type a topic, watch pages appear live |
+| **Obsidian plugin: web search live view** | Watch pages appear as results stream in — job polling and live result panel (basic modal already in v0.1) |
 | **Mistral + Bedrock providers** | Additional OpenAI-compatible and AWS-native LLM backends |
 
 ---

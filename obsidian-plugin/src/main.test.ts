@@ -179,8 +179,7 @@ describe("SynthadocPlugin.ingestFile", () => {
 });
 
 describe("SynthadocPlugin web search command", () => {
-    it("shows coming-in-v2 notice and does not call api.ingest", async () => {
-        const { api } = await import("./api");
+    it("opens WebSearchModal — no longer shows coming-in-v2 notice", async () => {
         const { Notice } = await import("obsidian");
 
         const { default: SynthadocPlugin } = await import("./main");
@@ -190,10 +189,10 @@ describe("SynthadocPlugin web search command", () => {
         const cmd = (plugin.addCommand as any).mock.calls.find(
             (c: any) => c[0].id === "synthadoc-web-search"
         )?.[0];
+        // Invoking the callback should not throw and must not show the old stub notice
         cmd?.callback();
 
-        expect(Notice).toHaveBeenCalledWith(expect.stringContaining("coming in v2"));
-        expect(api.ingest).not.toHaveBeenCalled();
+        expect(Notice).not.toHaveBeenCalledWith(expect.stringContaining("coming in v2"));
     });
 
     it("web-search command is registered on onload", async () => {

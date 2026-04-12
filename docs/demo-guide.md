@@ -559,7 +559,16 @@ synthadoc ingest "search for: quantum computing IBM Google" --analyse-only -w hi
 # → {"entities": ["IBM", "Google", "quantum computing"], "tags": [...], "summary": "..."}
 ```
 
-**Via Obsidian plugin:** command palette → `Synthadoc: Ingest from URL...` — the same input accepts intent strings. Type `search for: Linus Torvalds Linux kernel creation 1991` and press **Ingest**.
+**Via Obsidian plugin — dedicated web search modal:**
+
+1. Open the command palette (`Ctrl+P` / `Cmd+P`)
+2. Run **Synthadoc: Web search...**
+3. Type a topic — e.g. `Linus Torvalds Linux kernel creation 1991`
+4. Press **Enter** or click **Search**
+5. You'll see: `Queued — job abc123. Pages will appear in your wiki as results are ingested.`
+6. Switch to the **Synthadoc: List jobs...** modal to watch the fan-out jobs complete
+
+The modal prepends `search for:` automatically — just type the topic, no prefix needed.
 
 ---
 

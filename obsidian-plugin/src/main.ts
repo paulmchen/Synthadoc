@@ -71,8 +71,8 @@ export default class SynthadocPlugin extends Plugin {
 
         this.addCommand({
             id: "synthadoc-web-search",
-            name: "Synthadoc: Web search (coming in v2)...",
-            callback: () => new Notice("Synthadoc: Web search is coming in v2 — not yet available"),
+            name: "Synthadoc: Web search...",
+            callback: () => new WebSearchModal(this.app).open(),
         });
 
         this.addCommand({
@@ -401,6 +401,44 @@ class IngestUrlModal extends Modal {
 
         btn.onclick = submit;
         input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+    }
+    onClose() { this.contentEl.empty(); }
+}
+
+class WebSearchModal extends Modal {
+    onOpen() {
+        const { contentEl } = this;
+        contentEl.createEl("h3", { text: "Synthadoc: Web search" });
+        contentEl.createEl("p", {
+            text: "Type a topic — Synthadoc will search the web and compile results into your wiki.",
+            cls: "synthadoc-muted",
+        }).style.cssText = "font-size:12px;margin-bottom:12px";
+
+        const row = contentEl.createEl("div");
+        row.style.cssText = "display:flex;gap:8px;margin-bottom:12px";
+        const input = row.createEl("input", { type: "text", placeholder: "e.g. Rust async runtimes" });
+        input.style.cssText = "flex:1;padding:4px 8px";
+        const btn = row.createEl("button", { text: "Search" });
+
+        const out = contentEl.createEl("p");
+
+        const submit = async () => {
+            const topic = input.value.trim();
+            if (!topic) return;
+            btn.disabled = true;
+            out.setText("Queuing web search…");
+            try {
+                const r = await api.ingest(`search for: ${topic}`) as any;
+                out.setText(`Queued — job ${r.job_id}. Pages will appear in your wiki as results are ingested.`);
+                new Notice(`Synthadoc: web search queued (job ${r.job_id})`);
+            } catch {
+                out.setText("Error: is synthadoc serve running?");
+            } finally { btn.disabled = false; }
+        };
+
+        btn.onclick = submit;
+        input.addEventListener("keydown", (e) => { if (e.key === "Enter") submit(); });
+        setTimeout(() => input.focus(), 50);
     }
     onClose() { this.contentEl.empty(); }
 }
