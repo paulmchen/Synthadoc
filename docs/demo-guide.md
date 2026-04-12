@@ -675,28 +675,44 @@ simultaneously. Leave this terminal running.
 
 **2. Register in Claude Desktop config**
 
-Open `%APPDATA%\Claude\claude_desktop_config.json` (Windows) or
-`~/Library/Application Support/Claude/claude_desktop_config.json` (macOS) and add:
+Locate your config file:
+
+| Platform | Path |
+|----------|------|
+| Windows (Store app) | `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json` |
+| Windows (direct install) | `%APPDATA%\Claude\claude_desktop_config.json` |
+| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
+
+Add the following entry, replacing the wiki path with the **absolute path** to your wiki root:
 
 ```json
 {
   "mcpServers": {
     "synthadoc-history": {
       "command": "synthadoc",
-      "args": ["serve", "--wiki", "history-of-computing", "--mcp-only"]
+      "args": ["serve", "--wiki", "C:\\Users\\you\\wikis\\history-of-computing", "--mcp-only"]
     }
   }
 }
 ```
+
+> **Important:** Use an absolute path for `--wiki`. Relative paths will not resolve because
+> Claude Desktop has no working directory context.
+
+> **Windows PATH note:** Claude Desktop may not inherit your user PATH. If the server fails
+> to start, add the Python Scripts folder (e.g.
+> `C:\Users\you\AppData\Roaming\Python\Python3xx\Scripts`) to your **system** PATH
+> (not user PATH), then restart Claude Desktop fully from the system tray.
 
 `--mcp-only` starts just the MCP transport without the HTTP API — use this when you only need
 Claude access and not the Obsidian plugin. Omit it (use plain `serve`) when running both.
 
 **3. Restart Claude Desktop**
 
-Open Claude Desktop → look for **synthadoc-history** in the MCP tools panel. You should see
-six tools: `synthadoc_ingest`, `synthadoc_query`, `synthadoc_lint`, `synthadoc_search`,
-`synthadoc_status`, `synthadoc_job_status`.
+Fully quit from the system tray (right-click → Quit) and relaunch. Open
+Settings → Local MCP servers — `synthadoc-history` should show a green **running** badge.
+You should see six tools: `synthadoc_ingest`, `synthadoc_query`, `synthadoc_lint`,
+`synthadoc_search`, `synthadoc_status`, `synthadoc_job_status`.
 
 ---
 
