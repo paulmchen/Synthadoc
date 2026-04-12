@@ -69,6 +69,15 @@ _DECISION_PROMPT = (
     "Detected entities: {entities}"
 )
 
+_OVERVIEW_PROMPT = (
+    "Write a 2-paragraph overview of a knowledge wiki based on the page titles and "
+    "excerpts below.\n"
+    "First paragraph: what topics this wiki covers.\n"
+    "Second paragraph: key themes and concepts found.\n"
+    "Keep it under 200 words. Plain text only — no markdown headings.\n\n"
+    "Pages:\n{pages}"
+)
+
 _VISION_PROMPT = (
     "Extract all text and key information from this image. "
     "Return plain text only, preserving the structure and content faithfully."
@@ -148,6 +157,38 @@ class IngestAgent:
         data["_tokens"] = resp.total_tokens
         await self._cache.set(ck, data)
         return data
+
+    async def _update_overview(self) -> None:
+        """Regenerate wiki/overview.md from the 10 most-recently-modified pages."""
+        if self._wiki_root is None:
+            return
+        wiki_dir = self._wiki_root / "wiki"
+        pages = sorted(
+            [p for p in wiki_dir.glob("*.md")
+             if p.stem not in {"overview", "index", "dashboard", "log"}],
+            key=lambda p: p.stat().st_mtime,
+            reverse=True,
+        )[:10]
+        if not pages:
+            return
+        page_ctx = []
+        for p in pages:
+            snippet = p.read_text(encoding="utf-8")[:200].replace("\n", " ")
+            page_ctx.append(f"- {p.stem}: {snippet}")
+        pages_str = "\n".join(page_ctx)
+        resp = await self._provider.complete(
+            messages=[Message(role="user",
+                              content=_OVERVIEW_PROMPT.format(pages=pages_str))],
+            temperature=0.3,
+            max_tokens=512,
+        )
+        from datetime import date as _date
+        content = (
+            f"---\ntitle: Wiki Overview\nstatus: auto\n"
+            f"updated: {_date.today().isoformat()}\n---\n\n"
+            f"# Wiki Overview\n\n{resp.text.strip()}\n"
+        )
+        (wiki_dir / "overview.md").write_text(content, encoding="utf-8", newline="\n")
 
     def _load_purpose(self) -> str:
         """Load wiki/purpose.md for scope filtering. Returns '' if absent."""
@@ -360,6 +401,9 @@ class IngestAgent:
                     result.pages_created.append(slug)
                     # New pages are orphans until manually linked — no auto-append to index.md.
                     # The dashboard.md "Orphan pages" Dataview table surfaces them for review.
+
+        if result.pages_created or result.pages_updated:
+            await self._update_overview()
 
         self._log.log_ingest(source=p.name,
                              pages_created=result.pages_created,
