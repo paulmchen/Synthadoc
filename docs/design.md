@@ -722,13 +722,16 @@ on_lint_complete   = { cmd = "python hooks/notify.py", blocking = true }  # bloc
 provider    = "tavily"   # only supported provider
 max_results = 20         # URLs returned per query; each enqueued as an ingest job
 
+# Cron format: minute hour day-of-month month day-of-week
+#              0-59   0-23 1-31         1-12  0-6 (0=Sun)
+
 [[schedule.jobs]]
 op   = "ingest --batch raw_sources/"
-cron = "0 2 * * *"
+cron = "0 2 * * *"   # every day at 02:00
 
 [[schedule.jobs]]
 op   = "lint"
-cron = "0 3 * * 0"
+cron = "0 3 * * 0"   # every Sunday at 03:00
 ```
 
 ### Config keys reference
