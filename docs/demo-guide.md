@@ -475,7 +475,10 @@ Orphan pages (1) - no inbound links:
 ```
 
 **In Obsidian:** open `wiki/dashboard.md` — the new page appears in the **Orphan pages**
-table. In Graph view it shows as an isolated node.
+table. In Graph view it may still appear connected if the page contains outbound
+`[[wikilinks]]` to other pages — Obsidian draws edges in both directions. Synthadoc
+defines an orphan as a page with no **inbound** links: no other page references it. The
+dashboard and lint report are the reliable way to identify orphans.
 
 **Three options:**
 
