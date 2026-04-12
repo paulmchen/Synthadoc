@@ -391,6 +391,36 @@ async def test_pptx_skill_empty_presentation(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_pdf_skill_invalid_file_raises_descriptive_error(tmp_path):
+    """PdfSkill raises a clear ValueError for corrupt or non-PDF files."""
+    from synthadoc.skills.pdf.scripts.main import PdfSkill
+    bad = tmp_path / "bad.pdf"
+    bad.write_bytes(b"this is not a pdf")
+    with pytest.raises(ValueError, match="Cannot read.*PDF"):
+        await PdfSkill().extract(str(bad))
+
+
+@pytest.mark.asyncio
+async def test_docx_skill_invalid_file_raises_descriptive_error(tmp_path):
+    """DocxSkill raises a clear ValueError for corrupt or non-DOCX files."""
+    from synthadoc.skills.docx.scripts.main import DocxSkill
+    bad = tmp_path / "bad.docx"
+    bad.write_bytes(b"this is not a docx")
+    with pytest.raises(ValueError, match="Cannot read.*Word"):
+        await DocxSkill().extract(str(bad))
+
+
+@pytest.mark.asyncio
+async def test_xlsx_skill_invalid_file_raises_descriptive_error(tmp_path):
+    """XlsxSkill raises a clear ValueError for corrupt or non-XLSX files."""
+    from synthadoc.skills.xlsx.scripts.main import XlsxSkill
+    bad = tmp_path / "bad.xlsx"
+    bad.write_bytes(b"this is not an xlsx")
+    with pytest.raises(ValueError, match="Cannot read.*Excel"):
+        await XlsxSkill().extract(str(bad))
+
+
+@pytest.mark.asyncio
 async def test_pptx_skill_invalid_file_raises_descriptive_error(tmp_path):
     """PptxSkill raises a clear ValueError for corrupt or non-PPTX files."""
     from synthadoc.skills.pptx.scripts.main import PptxSkill

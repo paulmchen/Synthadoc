@@ -34,15 +34,21 @@ class PdfSkill(BaseSkill):
                                 metadata={"pages": num_pages})
 
     def _extract_pypdf(self, source: str) -> tuple[str, int]:
-        parts = []
-        with open(source, "rb") as f:
-            reader = pypdf.PdfReader(f)
-            num_pages = len(reader.pages)
-            for page in reader.pages:
-                t = page.extract_text()
-                if t:
-                    parts.append(t)
-        return "\n".join(parts), num_pages
+        try:
+            parts = []
+            with open(source, "rb") as f:
+                reader = pypdf.PdfReader(f)
+                num_pages = len(reader.pages)
+                for page in reader.pages:
+                    t = page.extract_text()
+                    if t:
+                        parts.append(t)
+            return "\n".join(parts), num_pages
+        except Exception as exc:
+            raise ValueError(
+                f"Cannot read '{source}' as a PDF file: {exc}. "
+                "Ensure the file is a valid PDF document."
+            ) from exc
 
     def _extract_pdfminer(self, source: str) -> str:
         try:
