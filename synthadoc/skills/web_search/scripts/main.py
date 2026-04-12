@@ -5,7 +5,13 @@ from __future__ import annotations
 import os
 from synthadoc.skills.base import BaseSkill, ExtractedContent
 
-_INTENT_PREFIX = "search for:"
+import re
+
+# Matches all intents declared in SKILL.md; colon and leading whitespace optional
+_INTENT_RE = re.compile(
+    r"^(search\s+for|find\s+on\s+the\s+web|look\s+up|web\s+search|browse):?\s*",
+    re.IGNORECASE,
+)
 _DEFAULT_MAX_RESULTS = 20
 
 
@@ -20,9 +26,7 @@ class WebSearchSkill(BaseSkill):
         max_results = int(
             os.environ.get("SYNTHADOC_WEB_SEARCH_MAX_RESULTS", _DEFAULT_MAX_RESULTS)
         )
-        query = source
-        if source.lower().startswith(_INTENT_PREFIX):
-            query = source[len(_INTENT_PREFIX):].strip()
+        query = _INTENT_RE.sub("", source).strip() or source
 
         from synthadoc.skills.web_search.scripts.fetcher import search_tavily
         response = await search_tavily(query, max_results=max_results, api_key=api_key)

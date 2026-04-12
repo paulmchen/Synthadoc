@@ -35,10 +35,19 @@ async def test_web_search_extract_returns_child_sources(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_web_search_extracts_query_from_intent(monkeypatch):
-    """Query is extracted from 'search for: <query>' prefix."""
+@pytest.mark.parametrize("source,expected_query", [
+    ("search for: quantum computing",        "quantum computing"),
+    ("search for quantum computing",         "quantum computing"),   # no colon
+    ("Search For: Quantum Computing",        "Quantum Computing"),   # mixed case
+    ("look up: Dennis Ritchie",              "Dennis Ritchie"),
+    ("look up Dennis Ritchie",               "Dennis Ritchie"),
+    ("find on the web: AGPL licence",        "AGPL licence"),
+    ("web search: neural networks",          "neural networks"),
+    ("browse: Rust async runtime",           "Rust async runtime"),
+])
+async def test_web_search_extracts_query_from_intent(source, expected_query, monkeypatch):
+    """Intent prefix is stripped regardless of colon or capitalisation."""
     monkeypatch.setenv("TAVILY_API_KEY", "test-key")
-    monkeypatch.setenv("SYNTHADOC_WEB_SEARCH_MAX_RESULTS", "5")
 
     from synthadoc.skills.web_search.scripts.main import WebSearchSkill
     from synthadoc.skills.web_search.scripts import fetcher
@@ -50,12 +59,9 @@ async def test_web_search_extracts_query_from_intent(monkeypatch):
         return _make_tavily_response(1)
 
     with patch.object(fetcher, "search_tavily", side_effect=capture_search):
-        skill = WebSearchSkill()
-        await skill.extract("search for: Dennis Ritchie contributions to computing")
+        await WebSearchSkill().extract(source)
 
-    assert len(captured_query) == 1
-    assert "Dennis Ritchie" in captured_query[0]
-    assert "search for:" not in captured_query[0]
+    assert captured_query[0] == expected_query
 
 
 @pytest.mark.asyncio
