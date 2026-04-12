@@ -17,9 +17,10 @@ def test_bm25_search_under_50ms(tmp_wiki):
     from synthadoc.storage.wiki import WikiStorage
     from synthadoc.storage.search import HybridSearch
 
-    # Windows file I/O is ~3-4× slower than Linux; use a generous bound for the assertion.
-    # The benchmark test below records the real number for analysis.
-    threshold_ms = 50 if platform.system() != "Windows" else 200
+    # macOS and Windows CI runners are slower and noisier than Linux bare-metal.
+    # The 50ms SLO applies to Linux only; use a generous bound elsewhere.
+    # The benchmark test below records the real number for per-platform analysis.
+    threshold_ms = 50 if platform.system() == "Linux" else 200
 
     store = WikiStorage(tmp_wiki / "wiki")
     for i in range(100):
