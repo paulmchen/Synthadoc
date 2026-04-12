@@ -244,6 +244,8 @@ Skip this step if you do not plan to use Step 10.
 In **Graph view** (`Ctrl/Cmd+G`) you should see 10 interconnected nodes. The `index` and
 `dashboard` nodes connect to everything; topic pages cluster by cross-links.
 
+![Obsidian graph view of the history-of-computing wiki](synthadoc-graph-view.png)
+
 ---
 
 ### Step 1 — Start the server
