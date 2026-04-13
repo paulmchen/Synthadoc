@@ -11,7 +11,7 @@ from typing import Optional
 import yaml
 from filelock import FileLock
 
-_FRONTMATTER_FIELDS = ("title", "tags", "status", "confidence", "created", "sources")
+_FRONTMATTER_FIELDS = ("title", "tags", "status", "confidence", "created", "sources", "orphan")
 
 
 @dataclass
@@ -31,6 +31,7 @@ class WikiPage:
     confidence: str
     sources: list[SourceRef]
     created: Optional[str] = None
+    orphan: bool = False
 
 
 def _sources_to_dicts(sources: list[SourceRef]) -> list[dict]:
@@ -90,6 +91,7 @@ class WikiStorage:
                 "confidence": page.confidence,
                 "created": page.created,
                 "sources": _sources_to_dicts(page.sources),
+                "orphan": page.orphan,
             }
             body = page.content
         else:
@@ -126,6 +128,7 @@ class WikiStorage:
             confidence=fm.get("confidence", ""),
             sources=sources,
             created=fm.get("created"),
+            orphan=bool(fm.get("orphan", False)),
         )
 
     def page_exists(self, slug: str) -> bool:

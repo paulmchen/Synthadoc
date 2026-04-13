@@ -16,7 +16,13 @@ class XlsxSkill(BaseSkill):
                 for row in csv.reader(f):
                     rows.append(", ".join(row))
             return ExtractedContent(text="\n".join(rows), source_path=source, metadata={})
-        wb = openpyxl.load_workbook(source, read_only=True, data_only=True)
+        try:
+            wb = openpyxl.load_workbook(source, read_only=True, data_only=True)
+        except Exception as exc:
+            raise ValueError(
+                f"Cannot read '{source}' as an Excel file: {exc}. "
+                "Ensure the file is a valid .xlsx (Office Open XML) document."
+            ) from exc
         parts = []
         for name in wb.sheetnames:
             parts.append(f"## Sheet: {name}")

@@ -9,7 +9,13 @@ class DocxSkill(BaseSkill):
                      extensions=[".docx"])
 
     async def extract(self, source: str) -> ExtractedContent:
-        doc = Document(source)
+        try:
+            doc = Document(source)
+        except Exception as exc:
+            raise ValueError(
+                f"Cannot read '{source}' as a Word document: {exc}. "
+                "Ensure the file is a valid .docx (Office Open XML) document."
+            ) from exc
         text = "\n".join(p.text for p in doc.paragraphs if p.text.strip())
         return ExtractedContent(text=text, source_path=source,
                                 metadata={"paragraphs": len(doc.paragraphs)})

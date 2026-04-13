@@ -54,7 +54,7 @@ Most knowledge-management tools retrieve and summarize at query time. Synthadoc 
 | Agent orchestration | Orchestrator dispatches parallel IngestAgent, QueryAgent, LintAgent sub-agents with cost guards and retry backoff |
 | Sub-agent skills/plugins | 3-tier lazy-load skill system; drop a Python file in `skills/` to add a new file format without touching the core |
 | LLM wiki vs. RAG | Pre-compiled structured knowledge beats query-time synthesis for contradiction detection, graph traversal, and offline access |
-| MCP / CLI / HTTP | Synthadoc IS an MCP server — Claude Desktop can orchestrate it naturally; CLI and HTTP API support every other integration path |
+| CLI / HTTP | CLI and HTTP REST API cover every integration path — ingest, query, lint, audit, and job management |
 | Local-first | All data stays on your machine; localhost-only network binding; no cloud dependency except the LLM API itself |
 | Provider choice | Five LLM backends including free-tier Gemini and Groq — no single-vendor dependency |
 
@@ -106,7 +106,6 @@ Every page is a plain Markdown file with YAML frontmatter. No proprietary format
 | Persistent wikilink graph | **Yes** | No | No | No |
 | Local-first (no cloud data) | **Yes** | Varies | No | No |
 | Custom skill plugins | **Yes** | Limited | No | No |
-| MCP server built-in | **Yes** | No | No | No |
 | Obsidian integration | **Yes** | No | No | No |
 | Cost guard + audit trail | **Yes** | No | No | No |
 | Hook / CI integration | **Yes** (2 events) | No | No | No |
@@ -142,7 +141,7 @@ For full architecture details, data models, API reference, and plugin developmen
 - **3 agents** — IngestAgent (two-step cached synthesis), QueryAgent (BM25 + LLM), LintAgent (contradiction + orphan detection + auto-resolution)
 - **8 built-in skills** — PDF, URL, Markdown/TXT, DOCX, PPTX, XLSX/CSV, Image (vision), **Web search (Tavily — fully live)**
 - **Folder-based skill system** — each skill is a self-contained folder with a `SKILL.md` manifest; intent-based dispatch alongside extension matching; drop a folder in `skills/` to add a new format without touching core code
-- **3 access surfaces** — CLI (thin HTTP client), HTTP REST API, MCP server
+- **2 access surfaces** — CLI (thin HTTP client), HTTP REST API
 - **Obsidian plugin** — ingest (with file picker when no note is active), query (responsive modal, stays open), lint report, jobs list — all from the command palette; ribbon shows engine health + page count
 - **5 LLM providers** — Anthropic, OpenAI, **Gemini** (free tier), **Groq** (free tier), Ollama (local); switch with one config line
 - **Two-step ingest** — `_analyse()` caches entity extraction + summary; decision prompt uses summary instead of full text; reduces cost on large documents
@@ -253,9 +252,8 @@ The guide covers:
 2. Opening it in Obsidian
 3. Installing the Obsidian and Dataview plugins
 4. Running batch ingest
-5. Resolving a contradiction (manual, LLM, and Claude MCP)
+5. Resolving a contradiction (manual and LLM)
 6. Fixing an orphan page
-7. Controlling Synthadoc from Claude Desktop via MCP
 
 ---
 
@@ -343,7 +341,7 @@ synthadoc demo list
 ### Running the server
 
 ```bash
-# Start HTTP API + MCP + job worker
+# Start HTTP API + job worker
 synthadoc serve -w my-wiki
 
 # Custom port
@@ -351,9 +349,6 @@ synthadoc serve -w my-wiki --port 7071
 
 # Verbose debug logging to console
 synthadoc serve -w my-wiki --verbose
-
-# MCP-only (for Claude Desktop; no HTTP port bound)
-synthadoc serve -w my-wiki --mcp-only
 ```
 
 ### Ingesting sources

@@ -114,10 +114,15 @@ class SkillAgent:
 
     def detect_skill(self, source: str) -> SkillMeta:
         s = source.lower()
+        # Pass 1: extension/prefix match — takes priority over intent matching.
+        # This prevents words in a URL path (e.g. "document" in scribd.com/document/...)
+        # from being picked up by a different skill's intent triggers.
         for meta in self._registry.values():
             for ext in meta.triggers.extensions:
                 if s.endswith(ext) or s.startswith(ext):
                     return meta
+        # Pass 2: intent match
+        for meta in self._registry.values():
             for intent in meta.triggers.intents:
                 if intent in s:
                     return meta

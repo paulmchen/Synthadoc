@@ -35,8 +35,11 @@ class LintAgent:
             page = self._store.read_page(slug)
             if page:
                 for link in _WIKILINK_RE.findall(page.content):
-                    referenced.add(link.lower().replace(" ", "-"))
-        return [s for s in slugs if s not in referenced and s not in ("index", "log")]
+                    # Strip alias (e.g. [[slug|Display Text]]) before normalising
+                    slug_part = link.split("|")[0].strip()
+                    referenced.add(slug_part.lower().replace(" ", "-"))
+        return [s for s in slugs if s not in referenced
+                and s not in ("index", "dashboard", "log")]
 
     async def lint(self, scope: str = "all", auto_resolve: bool = False) -> LintReport:
         report = LintReport()
@@ -61,6 +64,12 @@ class LintAgent:
 
         if scope in ("all", "orphans"):
             report.orphan_slugs = self._find_orphans(slugs)
+            orphan_set = set(report.orphan_slugs)
+            for slug in slugs:
+                page = self._store.read_page(slug)
+                if page and page.orphan != (slug in orphan_set):
+                    page.orphan = slug in orphan_set
+                    self._store.write_page(slug, page)
 
         self._log.log_lint(resolved=report.contradictions_resolved,
                            flagged=report.contradictions_found - report.contradictions_resolved,

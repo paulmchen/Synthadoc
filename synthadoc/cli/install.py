@@ -15,7 +15,7 @@ from synthadoc.cli.main import app
 _REGISTRY = Path.home() / ".synthadoc" / "wikis.json"
 
 _DEMOS = {
-    "history-of-computing": Path(__file__).parent.parent.parent / "examples" / "history-of-computing",
+    "history-of-computing": Path(__file__).parent.parent / "demos" / "history-of-computing",
 }
 
 

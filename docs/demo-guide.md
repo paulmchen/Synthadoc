@@ -12,13 +12,14 @@ You open a folder on your filesystem as a "vault" and Obsidian gives it a struct
 
 **Key features relevant to Synthadoc:**
 
-| Feature | What it does |
-|---------|--------------|
-| **Graph view** | Visualises every `[[wikilink]]` between notes as a live node graph. Orphan pages (no inbound links) appear as isolated dots. |
-| **Properties panel** | Renders YAML frontmatter (`status`, `confidence`, `tags`, `created`) as a structured sidebar. |
-| **Dataview plugin** | Queries frontmatter across all notes in real time — like a SQL table over your markdown files. Powers the Synthadoc dashboard. |
-| **Command palette** | `Ctrl/Cmd+P` runs any plugin command, including Synthadoc's ingest and query. |
-| **Community plugins** | Extend Obsidian with third-party functionality installed from within the app. |
+
+| Feature               | What it does                                                                                                                    |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| **Graph view**        | Visualises every`[[wikilink]]` between notes as a live node graph. Orphan pages (no inbound links) appear as isolated dots.     |
+| **Properties panel**  | Renders YAML frontmatter (`status`, `confidence`, `tags`, `created`) as a structured sidebar.                                   |
+| **Dataview plugin**   | Queries frontmatter across all notes in real time — like a SQL table over your markdown files. Powers the Synthadoc dashboard. |
+| **Command palette**   | `Ctrl/Cmd+P` runs any plugin command, including Synthadoc's ingest and query.                                                   |
+| **Community plugins** | Extend Obsidian with third-party functionality installed from within the app.                                                   |
 
 Obsidian is free for personal use. Download it from **obsidian.md**.
 
@@ -31,13 +32,14 @@ synthadoc is a **compilation engine**: it reads raw source documents (PDFs, spre
 images, web pages) and uses an LLM to synthesise, cross-reference, and maintain a
 structured wiki automatically.
 
-| Without Synthadoc | With Synthadoc |
-|-------------------|----------------|
-| You write each note by hand | LLM synthesises notes from source documents |
-| You manage links between notes | Cross-references are inserted automatically |
+
+| Without Synthadoc                  | With Synthadoc                                                     |
+| ---------------------------------- | ------------------------------------------------------------------ |
+| You write each note by hand        | LLM synthesises notes from source documents                        |
+| You manage links between notes     | Cross-references are inserted automatically                        |
 | You notice contradictions manually | Ingest pipeline flags conflicting content (`status: contradicted`) |
-| You track orphan pages by eye | Dashboard and CLI report orphans with fix suggestions |
-| Notes are static once written | Wiki compiles incrementally as new sources arrive |
+| You track orphan pages by eye      | Dashboard and CLI report orphans with fix suggestions              |
+| Notes are static once written      | Wiki compiles incrementally as new sources arrive                  |
 
 synthadoc writes into the same Markdown files Obsidian reads. No special format — every
 synthadoc wiki page is a valid Obsidian note.
@@ -51,16 +53,17 @@ how to read one kind of content. Skills are selected by **file extension** or by
 **intent phrase** in the source string. No `--skill` flag needed; the engine detects it
 automatically.
 
-| Skill | Triggered by | Notes |
-|-------|-------------|-------|
-| `pdf` | `.pdf` extension · phrases: `pdf`, `research paper`, `document` | Primary: pypdf. CJK fallback: pdfminer.six |
-| `url` | `https://` / `http://` prefix · phrases: `fetch url`, `web page`, `website` | httpx + BeautifulSoup HTML cleaning |
-| `markdown` | `.md` / `.txt` extension · phrases: `markdown`, `text file`, `notes` | Direct read, no transformation |
-| `docx` | `.docx` extension · phrases: `word document`, `docx` | python-docx paragraph extraction |
-| `pptx` | `.pptx` extension · phrases: `powerpoint`, `presentation`, `pptx` | python-pptx; each slide as a titled section; speaker notes included |
-| `xlsx` | `.xlsx` / `.csv` extension · phrases: `spreadsheet`, `excel`, `csv` | openpyxl + stdlib csv |
-| `image` | `.png` `.jpg` `.jpeg` `.webp` `.gif` `.tiff` · phrases: `image`, `screenshot`, `diagram`, `photo` | Base64 → vision LLM |
-| `web_search` | Intent phrases only: `search for`, `find on the web`, `look up`, `web search`, `browse` | No file extension — purely intent-driven. Calls Tavily API; fans out top result URLs as individual ingest jobs. Requires `TAVILY_API_KEY`. |
+
+| Skill        | Triggered by                                                                                       | Notes                                                                                                                                      |
+| ------------ | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `pdf`        | `.pdf` extension · phrases: `pdf`, `research paper`, `document`                                   | Primary: pypdf. CJK fallback: pdfminer.six                                                                                                 |
+| `url`        | `https://` / `http://` prefix · phrases: `fetch url`, `web page`, `website`                       | httpx + BeautifulSoup HTML cleaning                                                                                                        |
+| `markdown`   | `.md` / `.txt` extension · phrases: `markdown`, `text file`, `notes`                              | Direct read, no transformation                                                                                                             |
+| `docx`       | `.docx` extension · phrases: `word document`, `docx`                                              | python-docx paragraph extraction                                                                                                           |
+| `pptx`       | `.pptx` extension · phrases: `powerpoint`, `presentation`, `pptx`                                 | python-pptx; each slide as a titled section; speaker notes included                                                                        |
+| `xlsx`       | `.xlsx` / `.csv` extension · phrases: `spreadsheet`, `excel`, `csv`                               | openpyxl + stdlib csv                                                                                                                      |
+| `image`      | `.png` `.jpg` `.jpeg` `.webp` `.gif` `.tiff` · phrases: `image`, `screenshot`, `diagram`, `photo` | Base64 → vision LLM                                                                                                                       |
+| `web_search` | Intent phrases only:`search for`, `find on the web`, `look up`, `web search`, `browse`             | No file extension — purely intent-driven. Calls Tavily API; fans out top result URLs as individual ingest jobs. Requires`TAVILY_API_KEY`. |
 
 **Custom skills:** drop a folder containing `SKILL.md` + `scripts/main.py` into
 `<wiki-root>/skills/` and the engine picks it up on next start — no install or restart
@@ -77,21 +80,19 @@ vault in one sequence. **Obsidian must already be installed** (download from obs
 **Step 1 — Install the demo wiki**
 
 **Windows (cmd.exe):**
+
 ```cmd
 synthadoc install history-of-computing --target %USERPROFILE%\wikis --demo
 ```
 
-**Windows (PowerShell):**
-```powershell
-synthadoc install history-of-computing --target $env:USERPROFILE\wikis --demo
-```
-
 **Linux / macOS:**
+
 ```bash
 synthadoc install history-of-computing --target ~/wikis --demo
 ```
 
 Expected output:
+
 ```
 Wiki 'history-of-computing' installed at ...
 Open .../history-of-computing/ as an Obsidian vault — pages are in .../history-of-computing/wiki/
@@ -103,6 +104,12 @@ Open .../history-of-computing/ as an Obsidian vault — pages are in .../history
 
 Open Obsidian → **Open folder as vault** → select the installed folder
 (e.g. `%USERPROFILE%\wikis\history-of-computing`).
+
+> **Tip — show all file types in the explorer:** By default Obsidian only displays
+> file types it natively understands. `.xlsx` and `.pptx` files in `raw_sources/`
+> will be hidden. To show them: **Settings → Files and links → Show all file types**
+> → toggle **on**. The files are always present on disk and synthadoc
+> reads them regardless of this setting — this is purely a display preference.
 
 ---
 
@@ -120,20 +127,22 @@ Dataview is required for the live dashboard in `wiki/dashboard.md`.
 The plugin is pre-built (`obsidian-plugin/main.js`) — no build step needed unless you
 modify the TypeScript source.
 
+First, change into the `obsidian-plugin/` folder inside your cloned synthadoc repository, then run:
+
 **Windows (cmd.exe):**
+
 ```cmd
 mkdir "%USERPROFILE%\wikis\history-of-computing\.obsidian\plugins\synthadoc"
 copy main.js "%USERPROFILE%\wikis\history-of-computing\.obsidian\plugins\synthadoc\"
 copy manifest.json "%USERPROFILE%\wikis\history-of-computing\.obsidian\plugins\synthadoc\"
 ```
 
-> Run these commands from inside the `obsidian-plugin\` folder.
-
 **Linux / macOS:**
+
 ```bash
 vault=~/wikis/history-of-computing
 mkdir -p "$vault/.obsidian/plugins/synthadoc"
-cp obsidian-plugin/main.js obsidian-plugin/manifest.json "$vault/.obsidian/plugins/synthadoc/"
+cp main.js manifest.json "$vault/.obsidian/plugins/synthadoc/"
 ```
 
 ---
@@ -160,14 +169,19 @@ Synthadoc supports five LLM providers. The demo uses Anthropic by default, but *
 Get a key at console.anthropic.com — pay-per-token, no free tier.
 
 **Windows (cmd.exe):**
+
 ```cmd
 set ANTHROPIC_API_KEY=sk-ant-your-key-here
 ```
+
 **Windows (PowerShell, permanent):**
+
 ```powershell
 [System.Environment]::SetEnvironmentVariable("ANTHROPIC_API_KEY", "sk-ant-your-key-here", "User")
 ```
+
 **Linux / macOS:**
+
 ```bash
 export ANTHROPIC_API_KEY="sk-ant-your-key-here"
 ```
@@ -178,10 +192,13 @@ export ANTHROPIC_API_KEY="sk-ant-your-key-here"
 2. Set the key:
 
 **Windows (cmd.exe):**
+
 ```cmd
 set GEMINI_API_KEY=your-gemini-key-here
 ```
+
 **Linux / macOS:**
+
 ```bash
 export GEMINI_API_KEY="your-gemini-key-here"
 ```
@@ -195,19 +212,40 @@ Open `<wiki-root>/.synthadoc/config.toml` (create it if absent) and add:
 default = { provider = "gemini", model = "gemini-2.0-flash" }
 ```
 
-Restart `synthadoc serve` after changing the config.
+If `synthadoc serve` is already running, restart it after changing the config.
 
 #### Switching providers mid-demo
 
 You can switch at any time by changing the `provider` line in `.synthadoc/config.toml` and restarting the server. The wiki, cache, and audit trail are provider-agnostic — switching providers does not require re-ingesting anything.
 
-| Provider | Key env var | Free tier |
-|----------|-------------|-----------|
-| `anthropic` | `ANTHROPIC_API_KEY` | No |
-| `openai` | `OPENAI_API_KEY` | No |
-| `gemini` | `GEMINI_API_KEY` | Yes (15 RPM, 1M tok/day) |
-| `groq` | `GROQ_API_KEY` | Yes (Llama/Mixtral models) |
-| `ollama` | _(none)_ | Yes (fully local) |
+
+| Provider    | Key env var         | Free tier                  |
+| ----------- | ------------------- | -------------------------- |
+| `anthropic` | `ANTHROPIC_API_KEY` | No                         |
+| `openai`    | `OPENAI_API_KEY`    | No                         |
+| `gemini`    | `GEMINI_API_KEY`    | Yes (15 RPM, 1M tok/day)   |
+| `groq`      | `GROQ_API_KEY`      | Yes (Llama/Mixtral models) |
+| `ollama`    | _(none)_            | Yes (fully local)          |
+
+#### Tavily (web search — optional)
+
+Web search ingestion (Step 10) requires a Tavily API key. Get a free key at
+**tavily.com** (1,000 searches/month, no credit card required).
+
+**Windows (cmd.exe):**
+
+```cmd
+set TAVILY_API_KEY=tvly-your-key-here
+```
+
+**Linux / macOS:**
+
+```bash
+export TAVILY_API_KEY="tvly-your-key-here"
+```
+
+If this key is not set, the server starts normally but web search jobs will fail.
+Skip this step if you do not plan to use Step 10.
 
 ---
 
@@ -238,31 +276,40 @@ synthadoc serve -w history-of-computing
 ```
 
 Expected output:
+
 ```
 HTTP API running on http://127.0.0.1:7070
 ```
 
+![synthadoc serve startup](synthadoc-serve.png)
+
+The banner confirms the port, wiki path, and PID. If you see
+`Warning: TAVILY_API_KEY is not set`, web search jobs will not work — set the key
+before Step 10 if you plan to use that feature.
+
 Use a **second terminal** for all commands below. All plugin commands are now active.
 
-> **Ribbon icon:** The Synthadoc book icon is in the narrow vertical strip on the far left
-> edge of the window. It may be near the bottom if other plugins have added icons above it —
-> hover over the icons to find the one with the **"Synthadoc status"** tooltip. Clicking it
-> shows the live page count. The ribbon icon is optional; all core functionality is in the
-> command palette (`Ctrl/Cmd+P`).
+> **Obsidian ribbon:** The ribbon is the narrow vertical icon strip on the far left edge of
+> the Obsidian window. Once the Synthadoc plugin is enabled, the Synthadoc book icon
+> (![ribbon icon](synthadoc-ribbon-icon.png)) appears there. It may be near the bottom if
+> other plugins have added icons above it — hover to find the one with the **"Synthadoc
+> status"** tooltip. Clicking it shows the live wiki page count. This is a convenience
+> shortcut; all Synthadoc functionality is also available via the command palette (`Ctrl/Cmd+P`).
 
 **Plugin commands available from this point on** (`Ctrl/Cmd+P` in Obsidian):
 
-| Command | What it does |
-|---|---|
-| `Synthadoc: Ingest current file as source` | Queues the open file for ingest |
-| `Synthadoc: Ingest all sources` | Queues every file under `raw_sources/` |
-| `Synthadoc: Ingest from URL...` | Opens a URL input modal; queues a web page for ingest |
-| `Synthadoc: Web search...` | Opens a search modal; type a topic and the engine fetches web results and ingests them *(v2)* |
-| `Synthadoc: Query wiki...` | Opens a query modal with markdown-rendered answer and citations |
-| `Synthadoc: Lint report` | Opens a modal showing contradicted pages and orphans |
-| `Synthadoc: Run lint` | Queues a lint job; shows a notice with contradiction + orphan counts |
-| `Synthadoc: Run lint with auto-resolve` | Same but LLM resolves contradictions automatically when confidence ≥ threshold |
-| `Synthadoc: List jobs...` | Opens a filterable jobs table with per-job result details |
+
+| Command                                    | What it does                                                                                 |
+| ------------------------------------------ | -------------------------------------------------------------------------------------------- |
+| `Synthadoc: Ingest current file as source` | Queues the open file for ingest                                                              |
+| `Synthadoc: Ingest all sources`            | Queues every file under`raw_sources/`                                                        |
+| `Synthadoc: Ingest from URL...`            | Opens a URL input modal; queues a web page for ingest                                        |
+| `Synthadoc: Web search...`                 | Opens a search modal; type a topic and the engine fetches web results and ingests them*(v2)* |
+| `Synthadoc: Query wiki...`                 | Opens a query modal with markdown-rendered answer and citations                              |
+| `Synthadoc: Lint report`                   | Opens a modal showing contradicted pages and orphans                                         |
+| `Synthadoc: Run lint`                      | Queues a lint job; shows a notice with contradiction + orphan counts                         |
+| `Synthadoc: Run lint with auto-resolve`    | Same but LLM resolves contradictions automatically when confidence ≥ threshold              |
+| `Synthadoc: List jobs...`                  | Opens a filterable jobs table with per-job result details                                    |
 
 ---
 
@@ -281,19 +328,22 @@ Each answer cites `[[wikilinks]]` pointing to the source pages.
 You can also query from Obsidian: open the command palette (`Ctrl/Cmd+P`) →
 `Synthadoc: Query wiki...` → type your question → press **Ask**.
 
+![Synthadoc query result in Obsidian](synthadoc-query-result.png)
+
 ---
 
 ### Step 3 — Batch ingest all demo sources
 
 The five source files are pre-built in `raw_sources/`:
 
-| File | Skill | Scenario |
-|------|-------|----------|
-| `turing-enigma-decryption.pdf` | `pdf` (`.pdf` extension) | **A — Clean merge**: enriches `alan-turing` |
-| `computing-pioneers-timeline.xlsx` | `xlsx` (`.xlsx` extension) | **A — Clean merge**: structured timeline, enriches multiple pages |
-| `cs-milestones-overview.pptx` | `pptx` (`.pptx` extension) | **A — Clean merge + new pages**: 6-slide deck; enriches `ada-lovelace`, `alan-turing`, `grace-hopper`; creates new pages for ENIAC, transistor history, and internet origins |
-| `first-compiler-controversy.pdf` | `pdf` (`.pdf` extension) | **B — Conflict**: contradicts `grace-hopper` |
-| `quantum-computing-primer.png` | `image` (`.png` extension) | **C — Orphan**: brand new topic, no existing page links to it |
+
+| File                               | Skill                      | Scenario                                                                                                                                                                      |
+| ---------------------------------- | -------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `turing-enigma-decryption.pdf`     | `pdf` (`.pdf` extension)   | **A — Clean merge**: enriches `alan-turing`                                                                                                                                  |
+| `computing-pioneers-timeline.xlsx` | `xlsx` (`.xlsx` extension) | **A — Clean merge**: structured timeline, enriches multiple pages                                                                                                            |
+| `cs-milestones-overview.pptx`      | `pptx` (`.pptx` extension) | **A — Clean merge + new pages**: 6-slide deck; enriches `ada-lovelace`, `alan-turing`, `grace-hopper`; creates new pages for ENIAC, transistor history, and internet origins |
+| `first-compiler-controversy.pdf`   | `pdf` (`.pdf` extension)   | **B — Conflict**: contradicts `grace-hopper`                                                                                                                                 |
+| `quantum-computing-primer.png`     | `image` (`.png` extension) | **C — Orphan**: brand new topic, no existing page links to it                                                                                                                |
 
 **Via CLI** using `--batch`:
 
@@ -309,6 +359,8 @@ Both methods enqueue one job per file. Watch all jobs at once:
 synthadoc jobs list -w history-of-computing
 ```
 
+![synthadoc jobs list output](synthadoc-jobs-list.png)
+
 Wait until all five show `completed`. Filter by status:
 
 ```
@@ -317,6 +369,12 @@ synthadoc jobs list --status completed -w history-of-computing
 ```
 
 Or from Obsidian: command palette → `Synthadoc: List jobs...` → use the filter dropdown.
+
+![Synthadoc jobs modal in Obsidian](synthadoc-jobs-modal.png)
+
+Once all jobs complete, open **Graph view** (`Ctrl/Cmd+G`) in Obsidian to see the expanded wiki — new nodes for the ingested topics will have appeared and linked into the existing graph:
+
+![Obsidian graph view after batch ingest](synthadoc-graph-view.png)
 
 ---
 
@@ -339,16 +397,19 @@ see how the engine mapped slide content to wiki pages:
 synthadoc audit history -w history-of-computing
 ```
 
+![synthadoc audit history output](synthadoc-audit-history.png)
+
 Expected pages touched or created:
 
-| Wiki page | What changed |
-|-----------|-------------|
-| `ada-lovelace.md` | Enriched with the 1843 Bernoulli-number algorithm detail from Slide 2 |
-| `alan-turing.md` | ENIAC context from Slide 3 merged alongside existing Turing content |
-| `grace-hopper.md` | The ENIAC Six detail from Slide 3 merged in |
-| `eniac.md` _(new)_ | Created from Slide 3 — ENIAC weight, speed, and the six programmers |
-| `transistor-and-moores-law.md` _(new)_ | Created from Slide 4 — Bell Labs, Shockley, Moore's Law |
-| `internet-history.md` _(new)_ | Created from Slide 5 — ARPANET, TCP/IP Flag Day |
+
+| Wiki page                              | What changed                                                          |
+| -------------------------------------- | --------------------------------------------------------------------- |
+| `ada-lovelace.md`                      | Enriched with the 1843 Bernoulli-number algorithm detail from Slide 2 |
+| `alan-turing.md`                       | ENIAC context from Slide 3 merged alongside existing Turing content   |
+| `grace-hopper.md`                      | The ENIAC Six detail from Slide 3 merged in                           |
+| `eniac.md` _(new)_                     | Created from Slide 3 — ENIAC weight, speed, and the six programmers  |
+| `transistor-and-moores-law.md` _(new)_ | Created from Slide 4 — Bell Labs, Shockley, Moore's Law              |
+| `internet-history.md` _(new)_          | Created from Slide 5 — ARPANET, TCP/IP Flag Day                      |
 
 The speaker notes on each slide are extracted and included in the synthesis context,
 giving the LLM extra background without cluttering the final wiki page.
@@ -383,6 +444,7 @@ The PDF argues Hopper's A-0 was a loader, not a compiler, and that FORTRAN (1957
 deserves the "first compiler" title — contradicting the existing page.
 
 **Check via CLI:**
+
 ```
 synthadoc lint report -w history-of-computing
 ```
@@ -417,8 +479,6 @@ synthadoc jobs status <job-id> -w history-of-computing
 The LLM proposes a resolution, appends it as a `**Resolution:**` block, and sets
 `status: active`. Review the result in Obsidian and edit if needed.
 
-> **Option 3 — Via Claude (MCP):** see Step 11 for MCP setup and a full example.
-
 ---
 
 ### Step 6 — Scenario C: Orphan detection and human decision
@@ -427,33 +487,43 @@ After `quantum-computing-primer.png` is processed, a new wiki page is created (e
 `wiki/quantum-computing.md`). No existing page links to it — it is an orphan.
 
 **Check via CLI:**
+
 ```
 synthadoc lint report -w history-of-computing
 ```
 
 ```
-Orphan pages (1) - no inbound links:
+Orphan pages (2) - no inbound links:
 
+  ada-lovelace
+    -> Add [[ada-lovelace]] to a related page, or add to wiki/index.md:
+         - [[ada-lovelace]] — computer science history, programming languages, open-source movement, artificial intelligence
   quantum-computing
     -> Add [[quantum-computing]] to a related page, or add to wiki/index.md:
-         - [[quantum-computing]] — quantum-computing, hardware, algorithms
+         - [[quantum-computing]] — quantum computing, qubits, Shor's algorithm, Grover's algorithm
 ```
 
 **In Obsidian:** open `wiki/dashboard.md` — the new page appears in the **Orphan pages**
-table. In Graph view it shows as an isolated node.
+table. In Graph view it may still appear connected if the page contains outbound
+`[[wikilinks]]` to other pages — Obsidian draws edges in both directions. Synthadoc
+defines an orphan as a page with no **inbound** links: no other page references it. The
+dashboard and lint report are the reliable way to identify orphans.
 
 **Three options:**
 
 **Option 1 — Link it (recommended):**
 Open `wiki/artificial-intelligence-history.md` and add a sentence such as:
+
 ```
 Quantum hardware such as [[quantum-computing]] may dramatically accelerate future AI workloads.
 ```
+
 Save. The page is no longer an orphan and disappears from the dashboard table.
 
 **Option 2 — Add to index:**
 The lint report prints a ready-to-paste suggested entry — copy it, open `wiki/index.md`,
 add a section heading if needed, and paste. Edit the description to your liking:
+
 ```markdown
 ## Platforms and AI
 - [[quantum-computing]] — quantum-computing, hardware, algorithms
@@ -462,6 +532,7 @@ add a section heading if needed, and paste. Edit the description to your liking:
 **Option 3 — Delete and re-ingest:**
 If the extracted content quality is poor, delete `wiki/quantum-computing.md` from Obsidian
 and re-ingest with a better source document later:
+
 ```
 synthadoc ingest raw_sources/quantum-computing-primer.png --force -w history-of-computing
 ```
@@ -479,6 +550,7 @@ synthadoc lint report -w history-of-computing
 ```
 
 Expected output when all issues are resolved:
+
 ```
 All clear — no contradictions or orphan pages found.
 ```
@@ -502,6 +574,7 @@ pages). `synthadoc status` shows page count, pending jobs, and total jobs.
 The demo used batch ingest. You can also ingest one file at a time:
 
 **Windows (PowerShell):**
+
 ```powershell
 @'
 # Ada Lovelace
@@ -514,6 +587,7 @@ synthadoc ingest raw_sources/ada-lovelace.txt -w history-of-computing
 ```
 
 **Linux / macOS:**
+
 ```bash
 cat > ~/wikis/history-of-computing/raw_sources/ada-lovelace.txt << 'EOF'
 # Ada Lovelace
@@ -543,13 +617,14 @@ The `web_search` skill is fully live in v0.1. Unlike every other skill, it has *
 
 **Trigger phrases** (any of these in the source string activates the skill):
 
-| Phrase | Example source string |
-|--------|-----------------------|
-| `search for` | `"search for: Dennis Ritchie C language Bell Labs"` |
+
+| Phrase            | Example source string                                    |
+| ----------------- | -------------------------------------------------------- |
+| `search for`      | `"search for: Dennis Ritchie C language Bell Labs"`      |
 | `find on the web` | `"find on the web: Linus Torvalds Linux creation story"` |
-| `look up` | `"look up Ada Lovelace Analytical Engine contributions"` |
-| `web search` | `"web search ENIAC first electronic computer 1945"` |
-| `browse` | `"browse recent articles on quantum error correction"` |
+| `look up`         | `"look up Ada Lovelace Analytical Engine contributions"` |
+| `web search`      | `"web search ENIAC first electronic computer 1945"`      |
+| `browse`          | `"browse recent articles on quantum error correction"`   |
 
 **Example — enrich the history-of-computing wiki via web search:**
 
@@ -615,15 +690,7 @@ The `synthadoc audit` commands query the append-only `audit.db` without needing 
 synthadoc audit history -w history-of-computing
 ```
 
-Expected output:
-```
-Source                                    Pages created  Pages updated  Tokens   Cost
-----------------------------------------  -------------  -------------  -------  ------
-raw_sources/turing-enigma-decryption.pdf  alan-turing                   4820     $0.031
-raw_sources/computing-pioneers-timeline…  ibm-history    alan-turing    6210     $0.040
-raw_sources/first-compiler-controversy…               grace-hopper     3950     $0.025
-raw_sources/quantum-computing-primer.p…  quantum-computing              5100     $0.033
-```
+![synthadoc audit history output](synthadoc-audit-history.png)
 
 **Cost summary** — token spend for the last 30 days:
 
@@ -632,6 +699,7 @@ synthadoc audit cost -w history-of-computing
 ```
 
 Expected output:
+
 ```
 Period: last 30 days
 Total tokens : 20,080
@@ -649,6 +717,7 @@ synthadoc audit events -w history-of-computing
 ```
 
 Expected output:
+
 ```
 2026-04-11 14:35  contradiction_found   grace-hopper ← first-compiler-controversy.pdf
 2026-04-11 14:37  auto_resolved         grace-hopper (confidence: 0.91)
@@ -658,144 +727,7 @@ These three commands replace the need to run raw `sqlite3` queries and are safe 
 
 ---
 
-### Step 12 — Control Synthadoc from Claude (MCP)
-
-Synthadoc exposes an MCP server so Claude Desktop (or any MCP-capable Claude surface) can drive
-the wiki in natural language — no CLI required.
-
-#### Set up
-
-**1. Start the server in MCP mode** (same process, adds MCP transport):
-
-```
-synthadoc serve -w history-of-computing
-```
-
-The standard `serve` command runs both the HTTP API (for the Obsidian plugin) and the MCP server
-simultaneously. Leave this terminal running.
-
-**2. Register in Claude Desktop config**
-
-Locate your config file:
-
-| Platform | Path |
-|----------|------|
-| Windows (Store app) | `%LOCALAPPDATA%\Packages\Claude_pzs8sxrjxfjjc\LocalCache\Roaming\Claude\claude_desktop_config.json` |
-| Windows (direct install) | `%APPDATA%\Claude\claude_desktop_config.json` |
-| macOS | `~/Library/Application Support/Claude/claude_desktop_config.json` |
-
-Add the following entry, replacing the wiki path with the **absolute path** to your wiki root:
-
-```json
-{
-  "mcpServers": {
-    "synthadoc-history": {
-      "command": "synthadoc",
-      "args": ["serve", "--wiki", "C:\\Users\\you\\wikis\\history-of-computing", "--mcp-only"]
-    }
-  }
-}
-```
-
-> **Important:** Use an absolute path for `--wiki`. Relative paths will not resolve because
-> Claude Desktop has no working directory context.
-
-> **Windows PATH note:** Claude Desktop may not inherit your user PATH. If the server fails
-> to start, add the Python Scripts folder (e.g.
-> `C:\Users\you\AppData\Roaming\Python\Python3xx\Scripts`) to your **system** PATH
-> (not user PATH), then restart Claude Desktop fully from the system tray.
-
-`--mcp-only` starts just the MCP transport without the HTTP API — use this when you only need
-Claude access and not the Obsidian plugin. Omit it (use plain `serve`) when running both.
-
-**3. Restart Claude Desktop**
-
-Fully quit from the system tray (right-click → Quit) and relaunch. Open
-Settings → Local MCP servers — `synthadoc-history` should show a green **running** badge.
-You should see six tools: `synthadoc_ingest`, `synthadoc_query`, `synthadoc_lint`,
-`synthadoc_search`, `synthadoc_status`, `synthadoc_job_status`.
-
----
-
-#### Use case A — Resolve the grace-hopper contradiction
-
-After Step 5, `wiki/grace-hopper.md` has `status: contradicted`. Instead of editing it manually,
-ask Claude:
-
-> *"Open my history-of-computing wiki and resolve the contradiction on the grace-hopper page."*
-
-Claude will:
-1. Call `synthadoc_lint(scope="contradictions")` to surface the conflict
-2. Call `synthadoc_query("What does the first-compiler-controversy PDF argue about Grace Hopper?")` to
-   understand both sides
-3. Propose a nuanced resolution (Hopper pioneered automated code generation with A-0;
-   FORTRAN 1957 was the first production compiler)
-4. Apply it via `synthadoc_ingest` or direct file edit + status change
-
-Review the result in Obsidian — the Properties panel should show `status: active`.
-
----
-
-#### Use case B — Ingest a web page
-
-Tell Claude:
-
-> *"Ingest this Wikipedia article into my history-of-computing wiki: https://en.wikipedia.org/wiki/ENIAC"*
-
-Claude calls `synthadoc_ingest(source="https://en.wikipedia.org/wiki/ENIAC")`, then polls
-`synthadoc_job_status(job_id)` until the job completes. The new `eniac` page appears in
-Obsidian automatically.
-
----
-
-#### Use case C — Find gaps in your wiki coverage
-
-Ask Claude:
-
-> *"What topics are missing or underdeveloped in my history-of-computing wiki?"*
-
-Claude calls `synthadoc_status()` for page count, then `synthadoc_search(terms=["coverage", "missing"])`,
-reads `wiki/index.md`, and cross-references what is linked vs. what is referenced in the sources.
-
----
-
-#### Use case D — Locate and fix orphan pages
-
-After Step 6, `quantum-computing` is an orphan. Tell Claude:
-
-> *"Check my history-of-computing wiki for orphan pages and suggest where to link them."*
-
-Claude calls `synthadoc_lint(scope="orphans")`, reads the orphan list, reads related pages
-(e.g. `artificial-intelligence-history.md`), and proposes a sentence to add — or edits it directly
-if the Obsidian Claude plugin is active.
-
----
-
-#### Use case E — Expand the wiki via web search
-
-After reviewing the wiki, tell Claude:
-
-> *"My history-of-computing wiki doesn't cover Dennis Ritchie or the C language. Search the web
-> and add pages for both."*
-
-Claude will:
-1. Call `synthadoc_ingest(source="search for: Dennis Ritchie C programming language Bell Labs history")` — intent phrase routes to `web_search`
-2. Call `synthadoc_ingest(source="search for: history of C programming language UNIX influence")` for supplementary context
-3. Poll `synthadoc_job_status(job_id)` for each job
-4. Call `synthadoc_query("What is the relationship between C, Unix, and Bell Labs?")` to verify the new pages are queryable
-5. Report the new pages created and suggest `[[wikilinks]]` to add in related pages such as `unix-history` and `programming-languages-overview`
-
-You can also drive multi-topic research in one prompt:
-
-> *"Search the web for the top 5 computing pioneers not yet in my wiki and add a page for each."*
-
-Claude reads `wiki/index.md` to find what is already covered, builds a list of gaps, then
-fires one `synthadoc_ingest` per topic using `search for:` intent strings, and links each
-new page back into `index.md`.
-
----
-
-### Step 13 — Hook: auto-commit wiki to git
+### Step 12 — Hook: auto-commit wiki to git
 
 Hooks let you trigger shell scripts on lifecycle events. This step wires up
 `git-auto-commit.py` so every successful ingest produces a git commit
@@ -881,6 +813,7 @@ synthadoc schedule add \
 ```
 
 Expected output:
+
 ```
 Scheduled: sched-a3f1b2c4
 ```
@@ -896,6 +829,7 @@ synthadoc schedule list -w history-of-computing
 ```
 
 Expected output:
+
 ```
 sched-a3f1b2c4  0 2 * * *  ingest --batch raw_sources/ -w history-of-computing
 ```
@@ -917,6 +851,7 @@ synthadoc schedule list -w history-of-computing
 ```
 
 Expected output:
+
 ```
 sched-a3f1b2c4  0 2 * * *  ingest --batch raw_sources/ -w history-of-computing
 sched-b7e9d012  0 3 * * 0  lint run -w history-of-computing
@@ -945,6 +880,7 @@ synthadoc uninstall history-of-computing
 ```
 
 Two confirmations required:
+
 1. `y` to confirm deletion
 2. Type `history-of-computing` to confirm the name
 

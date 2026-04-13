@@ -6,6 +6,7 @@ import os
 from synthadoc.skills.base import BaseSkill, ExtractedContent
 
 import re
+from urllib.parse import urlparse
 
 # Matches all intents declared in SKILL.md; colon and leading whitespace optional
 _INTENT_RE = re.compile(
@@ -13,6 +14,27 @@ _INTENT_RE = re.compile(
     re.IGNORECASE,
 )
 _DEFAULT_MAX_RESULTS = 20
+
+# Domains that block automated HTTP clients (Cloudflare, login walls, etc.).
+# URLs from these domains are skipped to prevent dead ingest jobs.
+_BLOCKED_DOMAINS = {
+    # Require JavaScript/login — can't be fetched by a plain HTTP client
+    "quora.com",
+    "medium.com",
+    "reddit.com",
+    "facebook.com",
+    "instagram.com",
+    "twitter.com",
+    "x.com",
+    "linkedin.com",
+    "tiktok.com",
+    # Require institutional/subscription access
+    "ieeexplore.ieee.org",
+    "dl.acm.org",
+    "sciencedirect.com",
+    "springer.com",
+    "jstor.org",
+}
 
 
 class WebSearchSkill(BaseSkill):
@@ -31,9 +53,18 @@ class WebSearchSkill(BaseSkill):
         from synthadoc.skills.web_search.scripts.fetcher import search_tavily
         response = await search_tavily(query, max_results=max_results, api_key=api_key)
 
+        def _allowed(url: str) -> bool:
+            try:
+                host = urlparse(url).hostname or ""
+                return not any(
+                    host == d or host.endswith("." + d) for d in _BLOCKED_DOMAINS
+                )
+            except Exception:
+                return True
+
         child_sources = [
             r["url"] for r in response.get("results", [])
-            if r.get("url")
+            if r.get("url") and _allowed(r["url"])
         ]
         return ExtractedContent(
             text="",
