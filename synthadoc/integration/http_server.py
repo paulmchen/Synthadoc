@@ -229,7 +229,8 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
         referenced: set[str] = set()
         for text in page_texts.values():
             for link in _WIKILINK_RE.findall(text):
-                referenced.add(link.lower().replace(" ", "-"))
+                slug_part = link.split("|")[0].strip()
+                referenced.add(slug_part.lower().replace(" ", "-"))
 
         orphan_slugs = [
             stem for stem in page_texts
