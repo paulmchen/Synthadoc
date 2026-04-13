@@ -797,6 +797,22 @@ synthadoc schedule remove sched-b7e9d012 -w history-of-computing
 
 ### Step 13 — Uninstall
 
+> **Stop the server first.** The serve process must be stopped before uninstalling,
+> otherwise the wiki directory will be locked or partially deleted on some systems.
+
+If the server is running in the background, stop it using the PID printed at startup
+(also saved in `<wiki-root>/.synthadoc/server.pid`):
+
+```bash
+# Linux / macOS
+kill $(cat ~/wikis/history-of-computing/.synthadoc/server.pid)
+
+# Windows (PowerShell)
+taskkill /PID (Get-Content "$env:USERPROFILE\wikis\history-of-computing\.synthadoc\server.pid") /F
+```
+
+Then uninstall:
+
 ```
 synthadoc uninstall history-of-computing
 ```

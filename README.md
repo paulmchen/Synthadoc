@@ -527,8 +527,15 @@ synthadoc schedule remove <id> -w my-wiki
 
 ### Removing a wiki
 
+Stop the server for that wiki before uninstalling — the serve process must not be running
+when the directory is deleted.
+
 ```bash
-# Two-step confirmation required — no --yes escape
+# Stop the background server (PID is in <wiki-root>/.synthadoc/server.pid)
+kill $(cat ~/wikis/my-wiki/.synthadoc/server.pid)          # Linux / macOS
+taskkill /PID <pid> /F                                      # Windows
+
+# Then uninstall — two-step confirmation required, no --yes escape
 synthadoc uninstall my-wiki
 ```
 
