@@ -300,6 +300,38 @@ The guide covers:
 
 ---
 
+## Creating Your Own Wiki
+
+Once you've walked through the demo, creating a wiki for your own domain takes two commands:
+
+```bash
+synthadoc install my-wiki --target ~/wikis --domain "Market conditions and trends in Canada"
+synthadoc serve -w my-wiki
+```
+
+`install` creates the folder structure and, if an API key is set, runs a one-time LLM scaffold that generates four domain-aware starter files:
+
+| File | Purpose |
+|---|---|
+| `wiki/index.md` | Table of contents — organises pages into domain-relevant categories with `[[wikilinks]]` |
+| `wiki/purpose.md` | Scope declaration — tells the ingest agent what belongs in this wiki and what to ignore |
+| `AGENTS.md` | LLM behaviour guidelines — domain-specific instructions for tone, terminology, and synthesis style |
+| `wiki/dashboard.md` | Live Dataview dashboard — orphan pages, contradictions, and page count (requires Obsidian + Dataview plugin) |
+
+These files are the wiki's "self-knowledge" — Synthadoc reads them on every ingest to decide how to classify, merge, and label new content for that domain.
+
+**Scaffold can be re-run at any time** as your domain evolves. Pages already linked in `index.md` are protected and never overwritten:
+
+```bash
+synthadoc scaffold -w my-wiki
+```
+
+From this point the workflow is the same as the demo: drop source files into `raw_sources/`, run `synthadoc ingest --batch raw_sources/ -w my-wiki`, query, lint, and let the wiki grow.
+
+See [docs/design.md](docs/design.md) for a full description of how ingest, contradiction detection, and orphan tracking work under the hood.
+
+---
+
 ## Configuration
 
 > **You do not need to configure anything to run the demo.** The demo wiki
