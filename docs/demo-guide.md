@@ -133,10 +133,12 @@ Dataview is required for the live dashboard in `wiki/dashboard.md`.
 1. **Settings** (gear icon, bottom-left) → **Community plugins** → **Turn on community plugins**
 2. Click **Browse** → search `Dataview` → **Install** → **Enable**
 
-> **Dataview cache:** Dataview caches frontmatter and does not always refresh immediately
-> when Synthadoc modifies files externally. If the dashboard appears stale after an ingest
-> or lint run, drop the cache from the command palette:
-> `Ctrl/Cmd+P` → **Dataview: Drop all cached file metadata**.
+> **Dataview cache:** Dataview caches frontmatter and does not always reflect changes
+> made externally by Synthadoc — pages may appear missing, stale, or show an old status
+> after an ingest or lint run. When the dashboard disagrees with
+> `synthadoc lint report`, drop the cache:
+> `Ctrl/Cmd+P` → **Dataview: Drop all cached file metadata**, then reopen the dashboard.
+> The CLI report reads files directly and is always authoritative.
 
 ---
 
@@ -437,11 +439,16 @@ Orphan pages (2) - no inbound links:
          - [[quantum-computing]] — quantum computing, qubits, Shor's algorithm, Grover's algorithm
 ```
 
-**In Obsidian:** open `wiki/dashboard.md` — the new page appears in the **Orphan pages**
+**In Obsidian:** open `wiki/dashboard.md` — the new page should appear in the **Orphan pages**
 table. In Graph view it may still appear connected if the page contains outbound
 `[[wikilinks]]` to other pages — Obsidian draws edges in both directions. Synthadoc
 defines an orphan as a page with no **inbound** links: no other page references it. The
 dashboard and lint report are the reliable way to identify orphans.
+
+> **Orphan count not matching the CLI?** Dataview may not have indexed the newly created
+> pages yet. Drop the cache: `Ctrl/Cmd+P` → **Dataview: Drop all cached file metadata**,
+> then reopen `dashboard.md`. Use `synthadoc lint report -w history-of-computing` as the
+> authoritative count — it reads files directly with no cache.
 
 **Three options:**
 
