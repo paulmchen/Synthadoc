@@ -902,7 +902,45 @@ Enforces per-operation budget limits. Evaluated before every LLM call.
 | `soft_warn_usd` | $0.50 | Log warning; auto-continue |
 | `hard_gate_usd` | $2.00 | Prompt user `Proceed? [y/N]`; block if N; skip prompt if `auto_confirm=True` or `--yes` flag |
 
-> **Cost tracking note.** In v0.1, `cost_usd` for ingest was always `$0.0000` — no per-model pricing table was implemented. In v0.2, query costs are estimated using an approximate per-token rate; ingest cost tracking remains approximate. Per-model pricing tables are planned for a future release. Token counts are always accurate. As a result, `soft_warn_usd` and `hard_gate_usd` do not yet trigger reliably. `auto_resolve_confidence_threshold` is unaffected — it uses LLM confidence scores, not cost.
+### Cost Tracking and Pricing
+
+**How cost is computed (v0.2.0+):**
+
+```
+LLM call → CompletionResponse(input_tokens, output_tokens)
+             ↓
+         estimate_cost(model, input_tokens, output_tokens, is_local)
+             ↓
+         pricing table lookup in synthadoc/providers/pricing.py
+             ↓
+         IngestResult.cost_usd  or  audit.db queries.cost_usd
+```
+
+**Pricing table (`synthadoc/providers/pricing.py`):**
+
+A static Python dict maps model name → `(input_usd_per_token, output_usd_per_token)`.
+Separate input and output rates reflect real-world API pricing (output tokens cost 3–5× more than input tokens for most models).
+
+| Provider | Example model | Input (per token) | Output (per token) |
+|---|---|---|---|
+| Anthropic | claude-haiku-4-5-20251001 | $0.000001 | $0.000005 |
+| Anthropic | claude-sonnet-4-6 | $0.000003 | $0.000015 |
+| OpenAI | gpt-4o-mini | $0.00000015 | $0.0000006 |
+| Gemini | gemini-2.0-flash | $0.0000003 | $0.0000025 |
+| Groq | llama-3.3-70b-versatile | $0.00000059 | $0.00000079 |
+
+**Special cases:**
+- **Ollama (local inference):** Always `$0.00` regardless of token count — `is_local=True` short-circuits the calculation.
+- **Unknown models:** Use a conservative fallback rate (`$0.000003` per token for both input and output) rather than crashing or silently reporting `$0.00`.
+
+**Token propagation:**
+
+- `CompletionResponse` (already in v0.1) carries `input_tokens` and `output_tokens` from every provider.
+- `QueryResult` gains `input_tokens` and `output_tokens` fields (v0.2.0); `Orchestrator.query()` calls `estimate_cost()` to compute `cost_usd` before writing to `audit.db`.
+- `IngestResult` gains `input_tokens` and `output_tokens` fields (v0.2.0); `Orchestrator._run_ingest()` calls `estimate_cost()` after ingest completes.
+- The vision call and analysis call in `IngestAgent` also accumulate tokens; the analysis call only has a total (split not available due to internal caching).
+
+**Refresh cadence:** The pricing table is refreshed at each major release. `_LAST_UPDATED` in `pricing.py` records the date of last review. See `CONTRIBUTING.md` for the release checklist.
 
 ### API
 
