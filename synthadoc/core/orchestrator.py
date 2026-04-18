@@ -72,6 +72,13 @@ class Orchestrator:
                 cache_version=self._cfg.cache.version,
             )
             result = await agent.ingest(source, force=force, bust_cache=force)
+            _agent_cfg = self._cfg.agents.resolve("ingest")
+            result.cost_usd = estimate_cost(
+                _agent_cfg.model,
+                result.input_tokens,
+                result.output_tokens,
+                is_local=(_agent_cfg.provider == "ollama"),
+            )
             # Fan out web search child sources — batch insert in one transaction
             if result.child_sources:
                 await self._queue.enqueue_many(

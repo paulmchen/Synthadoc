@@ -30,6 +30,8 @@ class IngestResult:
     pages_flagged: list[str] = field(default_factory=list)
     child_sources: list[str] = field(default_factory=list)
     tokens_used: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
     cost_usd: float = 0.0
     cache_hits: int = 0
     skipped: bool = False
@@ -282,6 +284,8 @@ class IngestAgent:
                 temperature=0.0,
             )
             result.tokens_used += vision_resp.total_tokens
+            result.input_tokens += vision_resp.input_tokens
+            result.output_tokens += vision_resp.output_tokens
             text = vision_resp.text[:8000]
         else:
             text = extracted.text[:8000]
@@ -289,6 +293,7 @@ class IngestAgent:
         # Step 1: analysis pass (cached separately from decision)
         analysis = await self._analyse(text, bust_cache=bust_cache)
         result.tokens_used += analysis.pop("_tokens", 0)
+        # input/output split not available for the analyse call (cached via _analyse)
 
         entities = analysis.get("entities", [])
         tags = analysis.get("tags", [])
@@ -344,6 +349,8 @@ class IngestAgent:
                 temperature=0.0,
             )
             result.tokens_used += resp2.total_tokens
+            result.input_tokens += resp2.input_tokens
+            result.output_tokens += resp2.output_tokens
             decisions = _parse_json_response(resp2.text)
             await self._cache.set(ck2, decisions)
 
