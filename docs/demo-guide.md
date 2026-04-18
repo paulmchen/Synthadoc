@@ -265,6 +265,24 @@ synthadoc query "How did Moore's Law shape both hardware design and software exp
 
 Simple questions produce a single sub-question — behaviour is identical to before.
 
+#### What happens inside a compound query
+
+```
+Question:  "Who invented FORTRAN and what was the Bombe machine?"
+
+Server log:
+  query decomposed into 2 sub-question(s):
+    "Who invented FORTRAN?" | "What was the Bombe machine?"
+
+Pipeline:
+  → BM25 search for "Who invented FORTRAN?"       (parallel)
+  → BM25 search for "What was the Bombe machine?" (parallel)
+  → merge results — best score per page wins
+  → LLM synthesises a single answer citing both sets of pages
+```
+
+Simple single-topic questions decompose to 1 sub-question — behaviour identical to v0.1, no extra LLM call overhead.
+
 You can also query from Obsidian: open the command palette (`Ctrl/Cmd+P`) →
 `Synthadoc: Query wiki...` → type your question → press **Ask**.
 
@@ -388,7 +406,7 @@ synthadoc query "What was the Bombe machine, and how did it contribute to the Al
 This is the core knowledge-gap workflow: **query → notice gap → web search → re-query**.
 Each cycle makes the wiki denser, so future queries need the web less.
 
-> **Coming in v0.3:** Synthadoc will detect gaps automatically and suggest the exact ingest command — no manual step needed.
+> **Tip:** The `search for:` command above automatically decomposes your topic into multiple focused keyword searches — so one command pulls in results from several targeted Tavily queries rather than one broad search.
 
 ---
 
@@ -605,6 +623,28 @@ synthadoc jobs list -w history-of-computing
 ```
 
 Pages such as `dennis-ritchie`, `linux-kernel-history`, and `eniac` will be created or enriched. The `wiki/overview.md` page is regenerated automatically after each batch completes.
+
+#### What happens inside a web search
+
+When you run `synthadoc ingest "search for: ..."`, Synthadoc automatically decomposes your topic before hitting the web:
+
+```
+Input:  "search for: yard gardening in Canadian climate zones"
+
+Server log:
+  web search decomposed into 3 queries:
+    "Canada hardiness zones map" | "frost dates Canadian cities" | "planting guide by province Canada"
+
+Result:
+  3 parallel Tavily searches → URLs deduplicated across all results → fan-out to ~60 page ingest jobs
+  (vs ~20 from a single broad search)
+```
+
+The decomposition uses a keyword-oriented LLM prompt — separate from query decomposition — because
+search engines respond better to terse keyword strings than natural-language questions.
+
+If the LLM decompose call fails for any reason, Synthadoc falls back to your original phrase as a
+single search query — ingest always completes.
 
 **Batch web search using a manifest file:**
 
@@ -999,7 +1039,7 @@ Commands are grouped by prefix for easy navigation.
 | `Synthadoc: Ingest: current file` | Ingest the active note | Ingests the currently open note as a source. If no file is open, shows a file picker filtered to the configured raw sources folder. |
 | `Synthadoc: Ingest: all sources in folder` | Batch-ingest raw sources folder | Scans the `raw_sources` folder and queues every supported file (md, txt, pdf, docx, xlsx, csv, images) for ingestion. |
 | `Synthadoc: Ingest: from URL...` | Ingest a web page by URL | Opens a modal — paste any URL and queue it for fetch and ingestion. |
-| `Synthadoc: Ingest: web search...` | Search the web and ingest results | Opens a modal — type a topic and Synthadoc searches the web and compiles results directly into the wiki. `Ctrl/Cmd+Enter` to submit. |
+| `Synthadoc: Ingest: web search...` | Search the web and ingest results | Prompt for a topic; Synthadoc decomposes it into focused keyword sub-queries, fires parallel Tavily searches, deduplicates URLs, and ingests each as a separate wiki page. `Ctrl/Cmd+Enter` to submit. |
 
 ### Query
 

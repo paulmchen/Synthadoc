@@ -350,6 +350,55 @@ Each search fans out into up to 20 URL ingest jobs. Watch them process:
 synthadoc jobs list -w market-condition-canada
 ```
 
+### How decomposition works
+
+Both `query` and web search `ingest` commands automatically decompose complex inputs into focused sub-tasks:
+
+**Query decomposition** — a compound question is split into independent sub-questions, each retrieving its own pages, results merged before synthesis:
+
+```bash
+# Simple question — no decomposition (single BM25 search)
+synthadoc query "What is FORTRAN?" -w history-of-computing
+
+# Compound question — automatically decomposed into 2 parallel retrievals
+synthadoc query "Who invented FORTRAN and what was the Bombe machine?" -w history-of-computing
+# → sub-question 1: "Who invented FORTRAN?"
+# → sub-question 2: "What was the Bombe machine?"
+# → BM25 search runs in parallel for each; results merged before answering
+```
+
+**Web search decomposition** — a search topic is split into focused keyword strings, each firing a separate Tavily search:
+
+```bash
+# Single topic → automatically decomposed into focused keyword sub-queries
+synthadoc ingest "search for: yard gardening in Canadian climate zones" -w my-garden-wiki
+# Server log shows:
+#   web search decomposed into 3 queries:
+#     "Canada hardiness zones map" | "frost dates Canadian cities" | "planting guide by province Canada"
+# → 3 parallel Tavily searches → URLs merged and deduplicated → ~60 pages ingested vs ~20 from a single search
+```
+
+Both features fall back gracefully — if the LLM decomposition call fails, the original input is used as-is.
+
+### Knowledge gap workflow
+
+When a query returns a thin or empty answer, the wiki doesn't yet cover that topic. Use the gap-filling workflow:
+
+```bash
+# 1. Query reveals a gap
+synthadoc query "What are the employment trends in Toronto GTA?" -w market-wiki
+# → "No relevant pages found."
+
+# 2. Fill the gap with a web search ingest (decomposition fires automatically)
+synthadoc ingest "search for: Toronto GTA employment market 2025" -w market-wiki
+synthadoc jobs list -w market-wiki   # wait for jobs
+
+# 3. Re-query — now draws from newly ingested pages
+synthadoc query "What are the employment trends in Toronto GTA?" -w market-wiki
+```
+
+Each ingest cycle makes the wiki denser — future queries need the web less.
+
 **2. Run lint and query** — once jobs complete, check what was built and whether anything conflicts:
 
 ```bash
@@ -372,9 +421,7 @@ The recommended workflow is:
 2. Wait for ingest jobs to complete (`synthadoc jobs list -w market-condition-canada`)
 3. Re-run the query — it now finds the newly ingested pages
 
-Web search fans out into up to 20 URL ingest jobs automatically. Each URL is ingested as a separate page and categorised against your `purpose.md` and `AGENTS.md` before being written to the wiki.
-
-> **Coming in v0.3:** When a query detects a knowledge gap it will suggest the exact `synthadoc ingest` command to run — no manual gap analysis needed.
+Web search fans out into up to 20 URL ingest jobs automatically. Each URL is ingested as a separate page and categorised against your `purpose.md` and `AGENTS.md` before being written to the wiki. The `search for:` command also decomposes your topic into multiple focused keyword sub-queries before hitting Tavily — see [How decomposition works](#how-decomposition-works) above.
 
 **3. Re-run scaffold** — now that the wiki has real pages, scaffold can generate a much richer index with categories that reflect actual content:
 
@@ -976,6 +1023,7 @@ Edit `<wiki-root>/AGENTS.md` to give the LLM domain-specific instructions — wh
 |---------|-------|
 | **Query decomposition** | Complex questions automatically split into focused sub-queries, each retrieved independently then synthesised — compound and comparative questions answered correctly |
 | **Query audit trail** | Every query recorded in `audit.db`; `synthadoc audit queries` and `GET /audit/queries` show question history, sub-question counts, and token costs; `audit cost` now aggregates both ingest and query spend |
+| **Web search decomposition** | `synthadoc ingest "search for: <topic>"` automatically decomposes the topic into focused keyword sub-queries (up to 4), fires parallel Tavily searches, and deduplicates URLs — richer, more targeted pages from a single command |
 
 ---
 
