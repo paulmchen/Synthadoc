@@ -23,6 +23,8 @@ class QueryResult:
     answer: str
     citations: list[str]
     tokens_used: int = 0
+    input_tokens: int = 0
+    output_tokens: int = 0
 
 
 class QueryAgent:
@@ -104,4 +106,6 @@ class QueryAgent:
             answer=resp2.text,
             citations=citations,
             tokens_used=resp2.total_tokens,
+            input_tokens=resp2.input_tokens,
+            output_tokens=resp2.output_tokens,
         )

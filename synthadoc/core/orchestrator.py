@@ -13,6 +13,8 @@ from synthadoc.core.hooks import HookExecutor
 from synthadoc.core.queue import JobQueue
 from synthadoc.observability.telemetry import get_tracer, setup_telemetry
 from synthadoc.providers import make_provider
+from synthadoc.providers.ollama import OllamaProvider
+from synthadoc.providers.pricing import estimate_cost
 from synthadoc.storage.log import AuditDB, LogWriter
 from synthadoc.storage.search import HybridSearch
 from synthadoc.storage.wiki import WikiStorage
@@ -168,7 +170,14 @@ class Orchestrator:
             provider=make_provider("query", self._cfg),
             store=self._store, search=self._search,
         ).query(question)
-        cost_usd = result.tokens_used * 0.000003
+        _provider = make_provider("query", self._cfg)
+        _model = self._cfg.agents.resolve("query").model
+        cost_usd = estimate_cost(
+            _model,
+            result.input_tokens,
+            result.output_tokens,
+            is_local=isinstance(_provider, OllamaProvider),
+        )
         await self._audit.record_query(
             question=question,
             sub_questions_count=len(result.citations) or 1,
