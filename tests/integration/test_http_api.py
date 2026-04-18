@@ -102,6 +102,37 @@ def test_retry_job_endpoint(tmp_wiki):
     mock_retry.assert_awaited_once_with("dead-1")
 
 
+def test_audit_queries_returns_empty_initially(tmp_wiki):
+    """GET /audit/queries must return an empty list before any queries are made."""
+    from synthadoc.integration.http_server import create_app
+    with TestClient(create_app(wiki_root=tmp_wiki)) as client:
+        resp = client.get("/audit/queries")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["records"] == []
+    assert data["count"] == 0
+
+
+def test_audit_queries_returns_recorded_data(tmp_wiki):
+    """GET /audit/queries must return records after queries have been made."""
+    import asyncio
+    from synthadoc.integration.http_server import create_app
+    from synthadoc.storage.log import AuditDB
+    # Pre-populate the DB file before the server starts so it shares the record
+    db = AuditDB(tmp_wiki / ".synthadoc" / "audit.db")
+    asyncio.run(db.init())
+    asyncio.run(db.record_query(
+        question="What is Moore's Law?", sub_questions_count=1,
+        tokens=125, cost_usd=0.0004,
+    ))
+    with TestClient(create_app(wiki_root=tmp_wiki)) as client:
+        resp = client.get("/audit/queries")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["count"] == 1
+    assert data["records"][0]["question"] == "What is Moore's Law?"
+
+
 def test_query_post_provider_unavailable_returns_502(tmp_wiki):
     """If the LLM provider raises a connection error, POST /query must return 502."""
     from synthadoc.integration.http_server import create_app
