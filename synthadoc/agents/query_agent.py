@@ -64,11 +64,20 @@ class QueryAgent:
             if isinstance(parts, list) and parts:
                 filtered = [str(q) for q in parts[:_MAX_SUB_QUESTIONS] if str(q).strip()]
                 if filtered:
-                    logger.info("query decomposed into %d sub-question(s)", len(filtered))
-                    logger.debug("sub-questions: %s", filtered)
+                    if len(filtered) == 1:
+                        logger.info("query is simple — no decomposition (1 sub-question)")
+                    else:
+                        logger.info(
+                            "query decomposed into %d sub-question(s): %s",
+                            len(filtered),
+                            " | ".join(f'"{q}"' for q in filtered),
+                        )
                     return filtered
-        except Exception:
-            logger.warning("decompose failed — falling back to original question", exc_info=True)
+        except Exception as exc:
+            logger.warning(
+                "decompose failed (%s: %s) — falling back to original question",
+                type(exc).__name__, exc,
+            )
         return [question]
 
     async def query(self, question: str) -> QueryResult:

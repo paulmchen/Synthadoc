@@ -385,3 +385,147 @@ async def test_subquestions_retrieved_in_parallel(tmp_wiki):
 
     assert len(gather_calls) == 1, "asyncio.gather must be called exactly once per query"
     assert gather_calls[0] == 2, "both sub-questions must be passed to gather together"
+
+
+# ── decompose() edge cases ────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_decompose_provider_exception_falls_back(tmp_wiki):
+    """If the provider raises any exception, decompose() must return [question]."""
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.side_effect = RuntimeError("network error")
+    agent = QueryAgent(provider=provider, store=store, search=search)
+    result = await agent.decompose("What is Moore's Law?")
+    assert result == ["What is Moore's Law?"]
+
+
+@pytest.mark.asyncio
+async def test_decompose_truncates_long_question(tmp_wiki):
+    """Questions longer than 4000 chars must be truncated before the LLM call."""
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.return_value = CompletionResponse(
+        text='["short sub-question"]', input_tokens=5, output_tokens=5
+    )
+    agent = QueryAgent(provider=provider, store=store, search=search)
+    long_question = "x" * 5000
+    await agent.decompose(long_question)
+    called_content = provider.complete.call_args[1]["messages"][0].content \
+        if provider.complete.call_args[1] else provider.complete.call_args[0][0][0].content
+    # The question embedded in the prompt must not exceed 4000 chars
+    assert len(long_question) > 4000
+    assert "x" * 4001 not in called_content
+
+
+@pytest.mark.asyncio
+async def test_decompose_json_object_falls_back(tmp_wiki):
+    """If the LLM returns a JSON object instead of an array, fall back to original question."""
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.return_value = CompletionResponse(
+        text='{"sub_questions": ["a", "b"]}', input_tokens=5, output_tokens=5
+    )
+    agent = QueryAgent(provider=provider, store=store, search=search)
+    q = "What is AI?"
+    result = await agent.decompose(q)
+    assert result == [q]
+
+
+@pytest.mark.asyncio
+async def test_decompose_all_whitespace_after_filter_falls_back(tmp_wiki):
+    """If all entries in the array are whitespace-only after filtering, fall back."""
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.return_value = CompletionResponse(
+        text='["   ", "\\t", ""]', input_tokens=5, output_tokens=5
+    )
+    agent = QueryAgent(provider=provider, store=store, search=search)
+    q = "What is AI?"
+    result = await agent.decompose(q)
+    assert result == [q]
+
+
+# ── performance: decompose() call count ──────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_decompose_called_exactly_once_per_query(tmp_wiki):
+    """query() must call decompose() exactly once regardless of sub-question count."""
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.side_effect = [
+        CompletionResponse(text='["sub1", "sub2", "sub3"]',
+                           input_tokens=10, output_tokens=10),
+        CompletionResponse(text="answer", input_tokens=100, output_tokens=20),
+    ]
+    agent = QueryAgent(provider=provider, store=store, search=search)
+
+    decompose_calls = []
+    original_decompose = agent.decompose
+
+    async def counting_decompose(q):
+        decompose_calls.append(q)
+        return await original_decompose(q)
+
+    agent.decompose = counting_decompose
+    await agent.query("multi-part question")
+    assert len(decompose_calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_gather_arity_matches_sub_question_count(tmp_wiki):
+    """asyncio.gather() must receive exactly N coroutines for N sub-questions."""
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.side_effect = [
+        CompletionResponse(text='["q1", "q2", "q3"]',
+                           input_tokens=10, output_tokens=10),
+        CompletionResponse(text="answer", input_tokens=100, output_tokens=20),
+    ]
+    agent = QueryAgent(provider=provider, store=store, search=search)
+
+    gather_arities: list[int] = []
+    original_gather = asyncio.gather
+
+    async def spy(*coros, **kw):
+        gather_arities.append(len(coros))
+        return await original_gather(*coros, **kw)
+
+    import unittest.mock
+    with unittest.mock.patch("synthadoc.agents.query_agent.asyncio.gather", spy):
+        await agent.query("three-part question")
+
+    assert gather_arities == [3]
+
+
+@pytest.mark.asyncio
+async def test_simple_question_uses_single_gather_coroutine(tmp_wiki):
+    """A simple question decomposed to 1 sub-question must call gather with exactly 1 coroutine."""
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.side_effect = [
+        CompletionResponse(text='["What is AI?"]',
+                           input_tokens=5, output_tokens=5),
+        CompletionResponse(text="AI is ...", input_tokens=80, output_tokens=15),
+    ]
+    agent = QueryAgent(provider=provider, store=store, search=search)
+
+    gather_arities: list[int] = []
+    original_gather = asyncio.gather
+
+    async def spy(*coros, **kw):
+        gather_arities.append(len(coros))
+        return await original_gather(*coros, **kw)
+
+    import unittest.mock
+    with unittest.mock.patch("synthadoc.agents.query_agent.asyncio.gather", spy):
+        await agent.query("What is AI?")
+
+    assert gather_arities == [1]
