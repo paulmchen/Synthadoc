@@ -369,6 +369,27 @@ synthadoc query "When did the modern internet begin?" -w history-of-computing
 synthadoc query "What was the Bombe machine, and how did it contribute to the Allied victory in WWII?" -w history-of-computing
 ```
 
+#### When a query returns a thin answer — filling gaps with web search
+
+If the wiki doesn't cover a topic yet, the answer will be sparse or say "No relevant pages found."
+Use a targeted web search to pull in the missing knowledge, then re-query:
+
+```bash
+# Step 1 — ingest the missing topic
+synthadoc ingest "search for: Enigma machine cryptography WWII, Alan Turing Bombe machine design" -w history-of-computing
+
+# Step 2 — wait for jobs to complete
+synthadoc jobs list -w history-of-computing
+
+# Step 3 — re-query; the answer now draws from the ingested pages
+synthadoc query "What was the Bombe machine, and how did it contribute to the Allied victory in WWII?" -w history-of-computing
+```
+
+This is the core knowledge-gap workflow: **query → notice gap → web search → re-query**.
+Each cycle makes the wiki denser, so future queries need the web less.
+
+> **Coming in v0.3:** Synthadoc will detect gaps automatically and suggest the exact ingest command — no manual step needed.
+
 ---
 
 ### Step 4 — Scenario B: Conflict detection and resolution
@@ -658,6 +679,8 @@ Pass `--days 7` for a weekly view.
 ```
 synthadoc audit queries -w history-of-computing
 ```
+
+Query history is especially useful after running compound queries — you can see how many sub-questions each query was decomposed into and what it cost.
 
 Pass `--json` for machine-readable output, `-n N` to limit the number of records.
 

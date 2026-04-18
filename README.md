@@ -356,7 +356,25 @@ synthadoc jobs list -w market-condition-canada
 synthadoc lint run -w market-condition-canada
 synthadoc lint report -w market-condition-canada
 synthadoc query "What are the current employment trends in the Toronto GTA?" -w market-condition-canada
+# Compound question — automatically decomposed into two independent retrievals
+synthadoc query "What are the employment trends in Toronto GTA and how do interest rates affect the housing market?" -w market-condition-canada
 ```
+
+**When a query finds nothing — filling knowledge gaps with web search:**
+
+If a query returns a thin or empty answer, it means the wiki doesn't yet cover that topic.
+The recommended workflow is:
+
+1. Run a targeted web search to pull in the missing knowledge:
+   ```bash
+   synthadoc ingest "search for: Toronto GTA employment trends 2025, Bank of Canada rate impact on housing" -w market-condition-canada
+   ```
+2. Wait for ingest jobs to complete (`synthadoc jobs list -w market-condition-canada`)
+3. Re-run the query — it now finds the newly ingested pages
+
+Web search fans out into up to 20 URL ingest jobs automatically. Each URL is ingested as a separate page and categorised against your `purpose.md` and `AGENTS.md` before being written to the wiki.
+
+> **Coming in v0.3:** When a query detects a knowledge gap it will suggest the exact `synthadoc ingest` command to run — no manual gap analysis needed.
 
 **3. Re-run scaffold** — now that the wiki has real pages, scaffold can generate a much richer index with categories that reflect actual content:
 
