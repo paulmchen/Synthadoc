@@ -194,10 +194,68 @@ def _slugify(title: str) -> str:
 
 ### QueryAgent
 
-1. Extract search terms from the natural language question
-2. BM25 search against wiki
-3. LLM synthesizes answer from retrieved pages, citing `[[page-name]]` sources
-4. Optional: save answer as a new wiki page
+**Pipeline (v0.2.0 — query decomposition):**
+
+```
+Question
+ → Call 1: decompose() — LLM splits question into 1–N sub-questions (cap=4)
+   └─ on any LLM error: fall back to [question]          graceful degradation
+ → parallel BM25 search per sub-question                 asyncio.gather()
+ → merge candidates — best score wins per slug           deduplication
+ → Call 2: LLM synthesises answer from merged context    unchanged from v0.1
+ → record_query() in audit.db                            cost + history tracking
+ → log_query() in activity log                           operator visibility
+```
+
+**Decomposition behaviour:**
+- Simple questions decompose to a single sub-question — identical behaviour to v0.1
+- Compound questions (e.g. "Who invented FORTRAN and what was the Bombe machine?") decompose into one sub-question per part — each part retrieved independently, pages merged before synthesis
+- Comparative questions (e.g. "Compare Turing's contributions with Von Neumann's") retrieve both subjects in parallel
+- The LLM returns a JSON array of strings. Markdown code fences (` ```json ``` `) are stripped before parsing — required for cross-model robustness (some providers wrap JSON in fences despite instructions)
+- On any failure during decomposition (network error, invalid JSON, empty list, non-array response), the agent falls back silently to `[question]` — the query always completes
+
+**Logging (INFO level):**
+```
+query is simple — no decomposition (1 sub-question)
+query decomposed into 2 sub-question(s): "Who invented FORTRAN?" | "What was the Bombe machine?"
+```
+
+**BM25 corpus cache:** `HybridSearch` builds the BM25 corpus once per server session and caches it in memory (`_cached_corpus`). The cache is invalidated by `invalidate_index()` after every `write_page()` call in IngestAgent, so queries always see current wiki content without redundant disk reads.
+
+---
+
+### Web Search Decomposition (v0.2.0)
+
+> **Note:** Implementation is in `docs/plans/web-search-decomposition-v0.2.md`. This section describes the delivered behavior.
+
+**Motivation:** The v0.1 web search feature (`synthadoc ingest "search for: <topic>"`) fired a single Tavily API call for the entire input phrase. Decomposing the search intent into multiple focused keyword queries before fetching produces richer, more targeted pages — each sub-query targets a different aspect of the topic.
+
+**Pipeline:**
+
+```
+User input: "search for: yard gardening in Canadian climate zones"
+ → IngestAgent detects web_search skill
+ → strip intent prefix → "yard gardening in Canadian climate zones"
+ → SearchDecomposeAgent.decompose() — LLM returns terse keyword strings
+   e.g. ["Canada hardiness zones map",
+         "planting guide by province Canada",
+         "frost dates Canadian cities"]
+ → asyncio.gather() — N parallel Tavily API calls
+ → deduplicate URLs across results (first-seen wins, order preserved)
+ → merged child_sources → existing fan-out unchanged
+```
+
+**Key design decisions:**
+- Uses a **separate prompt** from `QueryAgent.decompose()` — query decomposition asks "what distinct *questions* does this ask?" (natural-language sub-questions) while search decomposition asks "what distinct *search strings* would find the best authoritative sources?" (terse keyword phrases). The outputs are fundamentally different — they must not share a prompt.
+- Implemented as `SearchDecomposeAgent` in `synthadoc/agents/search_decompose_agent.py` — kept separate to avoid coupling the two decomposition strategies.
+- Cap: 4 search strings maximum — prevents runaway Tavily API spend.
+- Fallback: if LLM call fails, JSON is invalid, or all entries are whitespace, use the original phrase as a single search query — the ingest always completes.
+
+**Logging (INFO level):**
+```
+web search is simple — no decomposition (1 query)
+web search decomposed into 3 queries: "Canada hardiness zones map" | "frost dates Canadian cities" | "planting guide by province Canada"
+```
 
 ### LintAgent
 
