@@ -1290,6 +1290,7 @@ Target: week of 2026-04-25.
 | **BM25 corpus caching** | ✅ v0.2.0 | In-memory corpus cache in `HybridSearch`; invalidated on write; eliminates redundant disk reads on decomposed queries |
 | **OpenAIProvider contract tests** | ✅ v0.2.0 | Covers OpenAI, Gemini, Groq, Ollama (all share `OpenAIProvider`) |
 | **HTTP 502 on LLM failure** | ✅ v0.2.0 | `/query` GET and POST return 502 Bad Gateway (not raw 500) when the LLM provider is unreachable |
+| **Web search decomposition** | ✅ v0.2.0 | `SearchDecomposeAgent` decomposes search intent into N keyword search strings; parallel Tavily API calls via `asyncio.gather`; URL deduplication across results; fallback to single query on LLM error |
 
 ### Planned
 
@@ -1403,3 +1404,4 @@ synthadoc schedule add --op "scaffold" --cron "0 4 * * 0" -w my-wiki
 - **OpenAIProvider contract tests** — 4 tests covering happy path, system message, null content, and custom `base_url` forwarding; applies to OpenAI, Gemini, Groq, and Ollama (all use `OpenAIProvider`)
 - **HTTP 502 on LLM failure** — `/query` GET and POST return 502 Bad Gateway (not raw 500) when the LLM provider is unreachable
 - **Obsidian plugin: 15 commands** — added `Audit: query history...` command with `QueryHistoryModal`
+- **Web search decomposition** — `SearchDecomposeAgent` breaks a web search intent into 1–4 focused keyword search strings (separate prompt from query decomposition); parallel Tavily searches; URL deduplication; graceful fallback on LLM error; integrated into `IngestAgent` at the web search fan-out point
