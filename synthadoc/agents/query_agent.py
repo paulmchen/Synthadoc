@@ -136,30 +136,59 @@ class QueryAgent:
         # Set gap_score_threshold = 0 to disable gap detection entirely.
         _max_score = max((r.score for r in candidates), default=0.0)
 
-        # Extract meaningful content words from the question for overlap check.
+        # Extract meaningful content words from the question for the overlap check.
+        # Strip 1 char for basic plural/suffix matching ("vegetables" → "vegetable",
+        # "indoors" → "indoor"). Stripping 2 chars was too aggressive — it turned
+        # "Canadian" into "canadi", which still matched every page in a Canada-focused
+        # wiki and made the check useless as a discriminator.
         _key_terms = {
-            w.lower()[:len(w) - 2]          # strip last 2 chars for basic stemming
+            w.lower().rstrip("s?!.,")        # strip plural/punctuation only
             for w in question.split()
             if len(w) > 4 and w.lower().rstrip("s?!.,") not in _STOPWORDS
         }
 
-        # Count pages whose stored content contains at least one key term.
-        _pages_with_overlap = sum(
-            1 for r in candidates
-            if (p := self._store.read_page(r.slug)) and
-               any(t in p.content.lower() for t in _key_terms)
-        ) if _key_terms else len(candidates)   # no key terms → skip this check
+        # Signal 3: pick the RAREST key term among the retrieved pages as the
+        # discriminating signal.  Generic terms ("spring", "canadian") appear in
+        # almost every page of a topic-specific wiki and inflate the count; the
+        # rarest term (e.g. "vegetable" in a flower-heavy wiki) tells us whether
+        # the wiki actually has DEDICATED content on the question's main topic.
+        #
+        # A page "covers" the topic if the discriminating term appears ≥ 3 times —
+        # a single mention in a bullet list is different from a dedicated section.
+        _MIN_TERM_FREQ = 3
+        if _key_terms and candidates:
+            # Count how many candidates contain each key term at all (doc frequency).
+            _term_doc_freq = {
+                t: sum(
+                    1 for r in candidates
+                    if (p := self._store.read_page(r.slug)) and t in p.content.lower()
+                )
+                for t in _key_terms
+            }
+            # The term that appears in fewest pages is the most topic-specific.
+            _discriminating_term = min(_term_doc_freq, key=lambda t: _term_doc_freq[t])
+
+            # Count pages where the discriminating term appears with meaningful frequency.
+            _pages_with_overlap = sum(
+                1 for r in candidates
+                if (p := self._store.read_page(r.slug)) and
+                   p.content.lower().count(_discriminating_term) >= _MIN_TERM_FREQ
+            )
+        else:
+            _discriminating_term = ""
+            _pages_with_overlap = len(candidates)   # no key terms → skip check
 
         _gap = self._gap_score_threshold > 0 and (
             len(candidates) < 3                          # signal 1: too few pages
             or _max_score < self._gap_score_threshold    # signal 2: low BM25 scores
-            or _pages_with_overlap < 2                   # signal 3: off-topic pages
+            or _pages_with_overlap < 2                   # signal 3: no dedicated coverage
         )
 
         # Always log retrieval quality so operators can tune gap_score_threshold.
         logger.info(
-            "query retrieval — pages=%d, max_score=%.2f, on_topic_pages=%d, gap=%s",
-            len(candidates), _max_score, _pages_with_overlap, _gap,
+            "query retrieval — pages=%d, max_score=%.2f, "
+            "discriminating_term=%r, on_topic_pages=%d, gap=%s",
+            len(candidates), _max_score, _discriminating_term, _pages_with_overlap, _gap,
         )
         if _gap:
             _suggested = await SearchDecomposeAgent(self._provider).decompose(question)
