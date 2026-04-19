@@ -222,6 +222,20 @@ query decomposed into 2 sub-question(s): "Who invented FORTRAN?" | "What was the
 
 **BM25 corpus cache:** `HybridSearch` builds the BM25 corpus once per server session and caches it in memory (`_cached_corpus`). The cache is invalidated by `invalidate_index()` after every `write_page()` call in IngestAgent, so queries always see current wiki content without redundant disk reads.
 
+**Knowledge gap detection:**
+
+After the BM25 merge step, if `len(candidates) < 3` OR `max_score < gap_score_threshold` (default: `2.0`, configurable via `[query] gap_score_threshold` in `synthadoc.toml`), a knowledge gap is detected:
+
+1. `SearchDecomposeAgent.decompose(question)` is called to generate 1–4 focused keyword search strings
+2. `QueryResult.knowledge_gap = True` and `QueryResult.suggested_searches = [...]` are set
+3. The CLI appends a `[!tip] Knowledge Gap Detected` Obsidian callout with:
+   - Obsidian Command Palette path (primary)
+   - `synthadoc ingest "search for: ..."` terminal commands (with `-w`)
+4. The API response includes `knowledge_gap` and `suggested_searches` fields
+5. The Obsidian `QueryModal` renders the same callout using `MarkdownRenderer.render()`
+
+When no gap is detected, `suggested_searches` is `[]` and no callout is shown.
+
 ---
 
 ### Web Search Decomposition (v0.2.0)

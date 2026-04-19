@@ -387,26 +387,26 @@ synthadoc query "When did the modern internet begin?" -w history-of-computing
 synthadoc query "What was the Bombe machine, and how did it contribute to the Allied victory in WWII?" -w history-of-computing
 ```
 
-#### When a query returns a thin answer — filling gaps with web search
+#### When a query returns a thin answer
 
-If the wiki doesn't cover a topic yet, the answer will be sparse or say "No relevant pages found."
-Use a targeted web search to pull in the missing knowledge, then re-query:
+If the wiki doesn't cover a topic yet, Synthadoc detects the gap automatically and suggests web searches:
 
-```bash
-# Step 1 — ingest the missing topic
-synthadoc ingest "search for: Enigma machine cryptography WWII, Alan Turing Bombe machine design" -w history-of-computing
-
-# Step 2 — wait for jobs to complete
-synthadoc jobs list -w history-of-computing
-
-# Step 3 — re-query; the answer now draws from the ingested pages
-synthadoc query "What was the Bombe machine, and how did it contribute to the Allied victory in WWII?" -w history-of-computing
+```
+> [!tip] Knowledge Gap Detected
+> Your wiki doesn't have enough on this topic yet. Enrich it with a web search:
+>
+> **From Obsidian:** Open Command Palette (`Cmd+P` / `Ctrl+P`) → **Synthadoc: Ingest: web search**
+>
+> **From the terminal:**
+> ```bash
+> synthadoc ingest "search for: Enigma machine cryptography WWII" -w history-of-computing
+> synthadoc ingest "search for: Alan Turing Bombe machine design" -w history-of-computing
+> ```
+>
+> After ingesting, re-run your query to get a richer answer.
 ```
 
-This is the core knowledge-gap workflow: **query → notice gap → web search → re-query**.
-Each cycle makes the wiki denser, so future queries need the web less.
-
-> **Tip:** The `search for:` command above automatically decomposes your topic into multiple focused keyword searches — so one command pulls in results from several targeted Tavily queries rather than one broad search.
+The gap is triggered when fewer than 3 pages are retrieved OR the best BM25 match scores below the configured threshold (`gap_score_threshold = 2.0` in `synthadoc.toml`). The suggested search strings are generated automatically by `SearchDecomposeAgent`.
 
 ---
 
