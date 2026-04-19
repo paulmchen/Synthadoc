@@ -29,11 +29,13 @@ class QueryResult:
 
 class QueryAgent:
     def __init__(self, provider: LLMProvider, store: WikiStorage,
-                 search: HybridSearch, top_n: int = 8) -> None:
+                 search: HybridSearch, top_n: int = 8,
+                 gap_score_threshold: float = 2.0) -> None:
         self._provider = provider
         self._store = store
         self._search = search
         self._top_n = top_n
+        self._gap_score_threshold = gap_score_threshold
 
     async def decompose(self, question: str) -> list[str]:
         """Break a question into focused sub-questions for independent retrieval.

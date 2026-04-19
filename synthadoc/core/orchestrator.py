@@ -176,6 +176,7 @@ class Orchestrator:
         result = await QueryAgent(
             provider=make_provider("query", self._cfg),
             store=self._store, search=self._search,
+            gap_score_threshold=self._cfg.query.gap_score_threshold,
         ).query(question)
         _provider = make_provider("query", self._cfg)
         _model = self._cfg.agents.resolve("query").model
