@@ -529,3 +529,34 @@ async def test_simple_question_uses_single_gather_coroutine(tmp_wiki):
         await agent.query("What is AI?")
 
     assert gather_arities == [1]
+
+
+# ── cost field propagation ────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_query_result_carries_input_and_output_tokens(tmp_wiki):
+    """QueryResult must expose input_tokens and output_tokens from the answer LLM call."""
+    store, search, provider = _make_agent(tmp_wiki)
+    provider.complete.side_effect = [
+        CompletionResponse(text='["term"]', input_tokens=10, output_tokens=5),
+        CompletionResponse(text="The answer.", input_tokens=120, output_tokens=40),
+    ]
+    agent = QueryAgent(provider=provider, store=store, search=search)
+    result = await agent.query("What is the answer?")
+    assert result.input_tokens == 120
+    assert result.output_tokens == 40
+    assert result.tokens_used == 160  # 120 + 40
+
+
+@pytest.mark.asyncio
+async def test_query_result_input_output_tokens_nonzero_for_real_call(tmp_wiki):
+    """input_tokens and output_tokens must be > 0 when the provider returns real counts."""
+    store, search, provider = _make_agent(tmp_wiki)
+    provider.complete.side_effect = [
+        CompletionResponse(text='["sub"]', input_tokens=8, output_tokens=3),
+        CompletionResponse(text="Answer here.", input_tokens=200, output_tokens=50),
+    ]
+    agent = QueryAgent(provider=provider, store=store, search=search)
+    result = await agent.query("Any question?")
+    assert result.input_tokens > 0
+    assert result.output_tokens > 0
