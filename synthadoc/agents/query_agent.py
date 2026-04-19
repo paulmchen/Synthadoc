@@ -17,6 +17,19 @@ logger = logging.getLogger(__name__)
 _MAX_SUB_QUESTIONS = 4
 _MAX_QUESTION_CHARS = 4000
 
+# Stopwords excluded when extracting key terms for the content-overlap gap check.
+# Keep this list lean — a false positive (treating a content word as a stopword)
+# suppresses gap detection; a false negative (missing a stopword) is harmless.
+_STOPWORDS = frozenset({
+    "what", "when", "where", "which", "who", "whom", "whose", "why", "how",
+    "should", "would", "could", "will", "does", "have", "with", "that", "this",
+    "they", "them", "their", "there", "then", "than", "also", "well", "just",
+    "some", "more", "very", "much", "many", "most", "from", "into", "onto",
+    "about", "after", "before", "between", "during", "through",
+    "these", "those", "each", "both", "your", "mine", "ours",
+    "start", "grow", "good", "best", "make", "need", "want",
+})
+
 
 @dataclass
 class QueryResult:
@@ -100,16 +113,55 @@ class QueryAgent:
                     best[r.slug] = r
         candidates = sorted(best.values(), key=lambda r: r.score, reverse=True)[:self._top_n]
 
-        # Knowledge gap detection (disabled when gap_score_threshold <= 0)
+        # ── Knowledge gap detection ────────────────────────────────────────────
+        # Three independent signals; any one triggers the gap:
+        #
+        #   1. Page count < 3  — wiki has almost nothing on the topic.
+        #
+        #   2. Max BM25 score < gap_score_threshold  — pages exist but their
+        #      keyword overlap with the query is weak (tunable via
+        #      [query] gap_score_threshold in synthadoc.toml; default 2.0).
+        #
+        #   3. Content overlap < 2  — BM25 scores are corpus-relative and can
+        #      be inflated by shared vocabulary even when pages are off-topic
+        #      (e.g. spring-flower pages match a vegetables query because both
+        #      use words like "spring", "planting", "Canada").  This check
+        #      counts how many retrieved pages actually contain at least one
+        #      key noun from the question.  Key terms = question words longer
+        #      than 4 chars that are not in _STOPWORDS, stem-truncated by 2
+        #      chars for basic suffix matching (vegetable → vegetabl).
+        #      If fewer than 2 pages pass this test, the wiki lacks on-topic
+        #      content regardless of BM25 scores.
+        #
+        # Set gap_score_threshold = 0 to disable gap detection entirely.
         _max_score = max((r.score for r in candidates), default=0.0)
+
+        # Extract meaningful content words from the question for overlap check.
+        _key_terms = {
+            w.lower()[:len(w) - 2]          # strip last 2 chars for basic stemming
+            for w in question.split()
+            if len(w) > 4 and w.lower().rstrip("s?!.,") not in _STOPWORDS
+        }
+
+        # Count pages whose stored content contains at least one key term.
+        _pages_with_overlap = sum(
+            1 for r in candidates
+            if (p := self._store.read_page(r.slug)) and
+               any(t in p.content.lower() for t in _key_terms)
+        ) if _key_terms else len(candidates)   # no key terms → skip this check
+
         _gap = self._gap_score_threshold > 0 and (
-            len(candidates) < 3 or _max_score < self._gap_score_threshold
+            len(candidates) < 3                          # signal 1: too few pages
+            or _max_score < self._gap_score_threshold    # signal 2: low BM25 scores
+            or _pages_with_overlap < 2                   # signal 3: off-topic pages
+        )
+
+        # Always log retrieval quality so operators can tune gap_score_threshold.
+        logger.info(
+            "query retrieval — pages=%d, max_score=%.2f, on_topic_pages=%d, gap=%s",
+            len(candidates), _max_score, _pages_with_overlap, _gap,
         )
         if _gap:
-            logger.info(
-                "knowledge gap detected — max_score=%.2f, pages=%d, threshold=%.2f",
-                _max_score, len(candidates), self._gap_score_threshold,
-            )
             _suggested = await SearchDecomposeAgent(self._provider).decompose(question)
         else:
             _suggested = []

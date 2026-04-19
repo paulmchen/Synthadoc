@@ -709,3 +709,46 @@ async def test_no_gap_search_decompose_not_called(tmp_wiki):
     # Only 2 provider calls: decompose + answer. No SearchDecomposeAgent call.
     assert provider.complete.call_count == 2
     assert result.knowledge_gap is False
+
+
+@pytest.mark.asyncio
+async def test_gap_detected_when_pages_are_off_topic(tmp_wiki):
+    """Signal 3: gap triggers when retrieved pages share vocabulary but lack key content words.
+
+    This covers the real-world case where a gardening wiki returns spring-flower
+    pages for a vegetables query — BM25 scores are high (shared: spring, Canada,
+    planting) but none of the pages actually contain the word 'vegetable'.
+    """
+    from synthadoc.storage.wiki import WikiPage
+    store = WikiStorage(tmp_wiki / "wiki")
+    # Write 5 pages that share gardening vocabulary but say nothing about vegetables.
+    for i in range(5):
+        store.write_page(f"flower-page-{i}", WikiPage(
+            title=f"Spring Flowers {i}", tags=["flowers"],
+            content=(
+                "Spring planting in Canada. Best flowers for Canadian gardens. "
+                "Plant tulips and daffodils after the last frost date in spring. "
+                "Soil preparation for flower beds in Canadian climate zones."
+            ),
+            status="active", confidence="high", sources=[],
+        ))
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.side_effect = [
+        # decompose call — single sub-question
+        CompletionResponse(text='["What vegetables grow in Canadian spring?"]',
+                           input_tokens=5, output_tokens=5),
+        # SearchDecomposeAgent call for suggestions (gap triggered)
+        CompletionResponse(text='["canadian spring vegetables planting", "frost dates vegetable Canada"]',
+                           input_tokens=8, output_tokens=8),
+        # answer synthesis call
+        CompletionResponse(text="No vegetable info found.", input_tokens=80, output_tokens=15),
+    ]
+    # Threshold high enough that signal 2 alone would not trigger (flowers pages will
+    # score well on BM25 for this query due to shared vocabulary).
+    agent = QueryAgent(provider=provider, store=store, search=search,
+                       gap_score_threshold=0.01)   # signal 2 disabled; signal 3 must fire
+    result = await agent.query("What vegetables grow well in a Canadian spring?")
+    # Signal 3: none of the flower pages contain 'vegetabl' — gap must be detected.
+    assert result.knowledge_gap is True
+    assert len(result.suggested_searches) >= 1
