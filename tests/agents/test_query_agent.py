@@ -2,11 +2,11 @@
 # Copyright (C) 2026 Paul Chen / axoviq.com
 import asyncio
 import pytest
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from synthadoc.agents.query_agent import QueryAgent, QueryResult
 from synthadoc.providers.base import CompletionResponse
 from synthadoc.storage.wiki import WikiStorage, WikiPage
-from synthadoc.storage.search import HybridSearch
+from synthadoc.storage.search import HybridSearch, SearchResult
 
 
 def _make_agent(tmp_wiki, answer_text="The answer.", decompose_json='["term"]'):
@@ -750,5 +750,142 @@ async def test_gap_detected_when_pages_are_off_topic(tmp_wiki):
                        gap_score_threshold=0.01)   # signal 2 disabled; signal 3 must fire
     result = await agent.query("What vegetables grow well in a Canadian spring?")
     # Signal 3: none of the flower pages contain 'vegetabl' — gap must be detected.
+    assert result.knowledge_gap is True
+    assert len(result.suggested_searches) >= 1
+
+
+def _fake_results(slugs: list[str], score: float = 5.0) -> list[SearchResult]:
+    """Return mock SearchResult list for patching bm25_search."""
+    return [SearchResult(slug=s, score=score, title=s, snippet="") for s in slugs]
+
+
+@pytest.mark.asyncio
+async def test_no_gap_when_one_key_term_is_a_synonym(tmp_wiki):
+    """Signal 3 must not fire when the rarest key term is absent only because the
+    wiki uses a different word for the same concept (synonym/location variant).
+
+    Real-world regression: query uses 'backyard' but wiki pages say 'garden'.
+    'backyard' has zero doc-frequency; the fix is to skip it and use the rarest
+    *covered* term ('plant') as the discriminator instead.
+
+    bm25_search is mocked so BM25 IDF behaviour does not affect this test.
+    """
+    store = WikiStorage(tmp_wiki / "wiki")
+    # Pages cover the topic well using "garden" throughout — "backyard" never appears.
+    # "plant" appears ≥ 3 times per page (as substring of "plants"/"Plant").
+    slugs = [f"garden-page-{i}" for i in range(5)]
+    for slug in slugs:
+        store.write_page(slug, WikiPage(
+            title="Garden Plants", tags=["garden"],
+            content=(
+                "Best plants for Canadian gardens. "
+                "Garden plants for partial shade areas. "
+                "Plant selection for shaded garden beds. "
+                "Shade-tolerant garden plants for your yard."
+            ),
+            status="active", confidence="high", sources=[],
+        ))
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.side_effect = [
+        CompletionResponse(text='["What plants grow well in a backyard?"]',
+                           input_tokens=5, output_tokens=5),
+        CompletionResponse(text="Many plants grow well in Canadian gardens.",
+                           input_tokens=80, output_tokens=20),
+    ]
+    agent = QueryAgent(provider=provider, store=store, search=search,
+                       gap_score_threshold=0.01)  # signal 2 disabled; only signal 3 can fire
+    with patch.object(agent._search, "bm25_search", return_value=_fake_results(slugs)):
+        result = await agent.query("What plants grow well in a backyard?")
+    # "backyard" is absent (wiki says "garden"), so it is skipped as a zero-freq term.
+    # "plant" covers all 5 pages with freq ≥ 3 → signal 3 does not fire.
+    assert result.knowledge_gap is False
+    assert result.suggested_searches == []
+
+
+@pytest.mark.asyncio
+async def test_gap_signal3_boundary_exactly_two_on_topic_pages(tmp_wiki):
+    """Signal 3 must NOT trigger when exactly two retrieved pages cover the
+    discriminating term with sufficient frequency.
+
+    The threshold is _pages_with_overlap < 2, so exactly 2 pages = no gap.
+
+    bm25_search is mocked so BM25 IDF behaviour does not affect this test.
+    """
+    store = WikiStorage(tmp_wiki / "wiki")
+    # 2 orchid pages have "orchid" ≥ 3 times; 3 pages have none.
+    for i in range(2):
+        store.write_page(f"orchid-page-{i}", WikiPage(
+            title="Orchid Care", tags=["orchid"],
+            content=(
+                "Orchid growing tips for home. "
+                "The best orchid varieties for shade. "
+                "Orchid plants need indirect light."
+            ),
+            status="active", confidence="high", sources=[],
+        ))
+    for i in range(3):
+        store.write_page(f"generic-page-{i}", WikiPage(
+            title="Garden Tips", tags=["garden"],
+            content="Best plants for Canadian gardens. Garden design tips.",
+            status="active", confidence="high", sources=[],
+        ))
+    all_slugs = [f"orchid-page-{i}" for i in range(2)] + [f"generic-page-{i}" for i in range(3)]
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.side_effect = [
+        CompletionResponse(text='["What orchid plants grow well?"]',
+                           input_tokens=5, output_tokens=5),
+        CompletionResponse(text="Orchid answer.", input_tokens=80, output_tokens=15),
+    ]
+    agent = QueryAgent(provider=provider, store=store, search=search,
+                       gap_score_threshold=0.01)
+    with patch.object(agent._search, "bm25_search", return_value=_fake_results(all_slugs)):
+        result = await agent.query("What orchid plants grow well indoors?")
+    # "orchid" is the discriminating term (rarest covered, doc_freq=2).
+    # Exactly 2 pages have "orchid" ≥ 3 times; 2 < 2 is False → no gap.
+    assert result.knowledge_gap is False
+    assert result.suggested_searches == []
+
+
+@pytest.mark.asyncio
+async def test_gap_signal3_boundary_one_on_topic_page(tmp_wiki):
+    """Signal 3 DOES trigger when only one retrieved page covers the discriminating
+    term with sufficient frequency (1 < 2 → gap).
+
+    bm25_search is mocked so BM25 IDF behaviour does not affect this test.
+    """
+    store = WikiStorage(tmp_wiki / "wiki")
+    # Only 1 page has "orchid" ≥ 3 times; 4 pages are off-topic.
+    store.write_page("orchid-page", WikiPage(
+        title="Orchid Care", tags=["orchid"],
+        content=(
+            "Orchid growing tips for home. "
+            "The best orchid varieties for shade. "
+            "Orchid plants need indirect light."
+        ),
+        status="active", confidence="high", sources=[],
+    ))
+    for i in range(4):
+        store.write_page(f"generic-page-{i}", WikiPage(
+            title="Garden Tips", tags=["garden"],
+            content="Best plants for Canadian gardens. Garden design tips.",
+            status="active", confidence="high", sources=[],
+        ))
+    all_slugs = ["orchid-page"] + [f"generic-page-{i}" for i in range(4)]
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.side_effect = [
+        CompletionResponse(text='["What orchid plants grow well?"]',
+                           input_tokens=5, output_tokens=5),
+        CompletionResponse(text='["orchid care guide", "indoor orchid growing"]',
+                           input_tokens=8, output_tokens=8),
+        CompletionResponse(text="Limited orchid info.", input_tokens=80, output_tokens=15),
+    ]
+    agent = QueryAgent(provider=provider, store=store, search=search,
+                       gap_score_threshold=0.01)
+    with patch.object(agent._search, "bm25_search", return_value=_fake_results(all_slugs)):
+        result = await agent.query("What orchid plants grow well indoors?")
+    # "orchid" is the discriminating term; only 1 page has it ≥ 3 times → 1 < 2 → gap.
     assert result.knowledge_gap is True
     assert len(result.suggested_searches) >= 1
