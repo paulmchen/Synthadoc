@@ -165,8 +165,15 @@ class QueryAgent:
                 )
                 for t in _key_terms
             }
-            # The term that appears in fewest pages is the most topic-specific.
-            _discriminating_term = min(_term_doc_freq, key=lambda t: _term_doc_freq[t])
+            # Prefer the rarest term that appears in at least one page.
+            # Zero-freq terms are often synonym mismatches (e.g. "backyard" vs "garden")
+            # rather than evidence of missing content.  Only fall back to a zero-freq
+            # term when ALL key terms are absent — that is an unambiguous content gap.
+            _covered = {t: f for t, f in _term_doc_freq.items() if f > 0}
+            if _covered:
+                _discriminating_term = min(_covered, key=lambda t: _covered[t])
+            else:
+                _discriminating_term = min(_term_doc_freq, key=lambda t: _term_doc_freq[t])
 
             # Count pages where the discriminating term appears with meaningful frequency.
             _pages_with_overlap = sum(
