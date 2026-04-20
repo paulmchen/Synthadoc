@@ -671,14 +671,21 @@ synthadoc ingest "search for: quantum computing IBM Google" --analyse-only -w hi
 # → {"entities": ["IBM", "Google", "quantum computing"], "tags": [...], "summary": "..."}
 ```
 
-**Via Obsidian plugin — dedicated web search modal:**
+**Via Obsidian plugin — live polling web search modal:**
 
 1. Open the command palette (`Ctrl+P` / `Cmd+P`)
-2. Run **Synthadoc: Web search...**
+2. Run **Synthadoc: Ingest: web search...**
 3. Type a topic — e.g. `Linus Torvalds Linux kernel creation 1991`
-4. Press **Enter** or click **Search**
-5. You'll see: `Queued — job abc123. Pages will appear in your wiki as results are ingested.`
-6. Switch to the **Synthadoc: List jobs...** modal to watch the fan-out jobs complete
+4. Optionally adjust the **Poll interval** (default: 2000 ms, range 500–10000 ms) — this controls how often the modal refreshes
+5. Press `Ctrl/Cmd+Enter` or click **Search**
+6. The modal transitions to a live view:
+   - **Searching the web…** — while Tavily fetches results
+   - **Found N URLs — ingesting…** — as fan-out jobs are created
+   - **Ingesting N URLs… (M done)** — counting completed child jobs
+   - A **Pages** list grows as each URL ingest completes and creates or updates wiki pages
+   - Any **Errors** (blocked domains, 404s) appear below in red
+   - **Done — N page(s) written.** when all jobs settle
+7. The modal stays open so you can review the page list — close it manually when done
 
 The modal prepends `search for:` automatically — just type the topic, no prefix needed.
 

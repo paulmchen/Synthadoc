@@ -390,6 +390,24 @@ synthadoc ingest "search for: yard gardening in Canadian climate zones" -w my-ga
 
 Both features fall back gracefully — if the LLM decomposition call fails, the original input is used as-is.
 
+### Semantic re-ranking (vector search)
+
+By default Synthadoc uses BM25 keyword search. For better recall on conceptually related queries, enable the optional vector search layer — it re-ranks BM25 candidates using `BAAI/bge-small-en-v1.5` cosine similarity:
+
+```toml
+# .synthadoc/config.toml
+[search]
+vector = true                # downloads ~130 MB model once on first enable
+vector_top_candidates = 20  # BM25 pool size; re-ranked down to top_n (default 8)
+```
+
+On first server start with `vector = true`:
+- The model is downloaded from Hugging Face to your local cache
+- All existing wiki pages are embedded in the background — BM25 continues serving during migration
+- New and updated pages are embedded automatically after each ingest
+
+BM25 is always used when vector search is disabled (the default). Vector search is purely additive — you can toggle it at any time.
+
 ### Knowledge gap workflow
 
 When a query returns a thin or empty answer, the wiki doesn't yet cover that topic. Use the gap-filling workflow:
@@ -507,6 +525,11 @@ hard_gate_usd = 2.00
 [web_search]
 provider    = "tavily"
 max_results = 20
+
+# Optional: enable semantic re-ranking (downloads ~130 MB model once)
+# [search]
+# vector = true
+# vector_top_candidates = 20   # BM25 candidate pool before cosine re-rank
 
 [hooks]
 on_ingest_complete = "python git-auto-commit.py"

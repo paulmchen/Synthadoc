@@ -465,7 +465,9 @@ See [Section 12 — Cache System](#12-cache-system).
 
 ### embeddings.db — Search index
 
-BM25 index over all wiki pages. Tokenizer handles ASCII and CJK:
+BM25 + optional vector index over all wiki pages. When vector search is disabled (default), only the BM25 index is used. When `[search] vector = true`, the same SQLite file also stores a `embeddings` table holding `float32` embedding vectors alongside the BM25 entries.
+
+**BM25 tokenizer** handles ASCII and CJK:
 
 ```python
 @staticmethod
@@ -516,10 +518,13 @@ Note: BM25 IDF requires a minimum of 3 documents in the corpus for non-zero scor
   "operation": "ingest",
   "created_at": "2026-04-10T14:32:01Z",
   "payload": {"source": "report.pdf"},
-  "result": {"pages_created": ["alan-turing"], "cost_usd": 0.0},
+  "result": {"pages_created": ["alan-turing"], "cost_usd": 0.0, "child_job_ids": []},
+  "progress": {"phase": "found_urls", "total": 5},
   "error": null
 }
 ```
+
+The `progress` field is updated in real time during execution (e.g. `{"phase": "searching"}` before Tavily call, `{"phase": "found_urls", "total": N}` after URLs are returned). It is `null` for jobs that do not emit progress. Web search jobs additionally store `child_job_ids` in `result` so callers can track the fan-out URL ingest jobs.
 
 **LintReport object:**
 
@@ -575,7 +580,7 @@ Reload the plugin (toggle off/on) after copying — a full Obsidian restart is n
 | `Synthadoc: Run lint` | Queues a lint job; shows a notice with contradiction + orphan counts when complete |
 | `Synthadoc: Run lint with auto-resolve` | Same as above but passes `auto_resolve: true` — LLM resolves contradictions automatically when confidence ≥ threshold |
 | `Synthadoc: List jobs...` | Modal with status-filter dropdown, results table, error details |
-| `Synthadoc: Web search...` | Modal — type a plain topic, engine prepends `search for:` and enqueues an ingest job; returns job ID |
+| `Synthadoc: Web search...` | Live-polling modal — type a plain topic; shows phase text, pages list, and URL errors in real time as fan-out jobs complete; configurable poll interval (500–10000 ms, default 2000 ms) |
 
 ### Ribbon icon
 
@@ -837,6 +842,8 @@ cron = "0 3 * * 0"   # every Sunday at 03:00
 | `logs.backup_count` | int | `5` | Rotated files to keep |
 | `web_search.provider` | str | `"tavily"` | Web search provider (currently only `tavily` supported) |
 | `web_search.max_results` | int | `20` | Maximum results fetched per web search query |
+| `search.vector` | bool | `false` | Enable semantic re-ranking; downloads `BAAI/bge-small-en-v1.5` (~130 MB) once on first enable |
+| `search.vector_top_candidates` | int | `20` | BM25 candidate pool size when vector re-ranking is active |
 
 ---
 
@@ -1308,17 +1315,17 @@ Target: week of 2026-04-25.
 | **HTTP 502 on LLM failure** | ✅ v0.2.0 | `/query` GET and POST return 502 Bad Gateway (not raw 500) when the LLM provider is unreachable |
 | **Web search decomposition** | ✅ v0.2.0 | `SearchDecomposeAgent` decomposes search intent into N keyword search strings; parallel Tavily API calls via `asyncio.gather`; URL deduplication across results; fallback to single query on LLM error |
 | **New Obsidian commands (8)** | ✅ v0.2.0 | `Lint: run`, `Lint: run with auto-resolve`, `Jobs: retry dead job...`, `Jobs: purge old completed/dead...`, `Wiki: regenerate scaffold...`, `Audit: ingest history...`, `Audit: cost summary...`, `Audit: query history...` — plugin now has 15 commands total (7 in v0.1) |
+| **Vector search + semantic re-ranking** | ✅ v0.2.0 | Opt-in hybrid BM25 + local vector search; `BAAI/bge-small-en-v1.5` model via `fastembed` (~130 MB, downloaded once); BM25 fetches `vector_top_candidates` (default 20) candidates, cosine similarity re-ranks to `top_n` (default 8); one-time background migration at server start embeds all existing pages; BM25 serves during migration; enable with `vector = true` in `[search]` config |
+| **Obsidian web search live view** | ✅ v0.2.0 | `WebSearchModal` replaced with live-polling panel; shows phase text ("Searching the web…", "Found N URLs — ingesting…"), live pages list, and URL errors as child jobs complete; configurable poll interval (500–10000 ms, default 2000 ms); modal stays open until done |
 
 ### Planned
 
 | Feature | Motivation |
 |---------|-----------|
 | **Web UI** | Browser-based dashboard — pages, jobs, contradictions, orphans — without requiring Obsidian |
-| **Vector search + re-ranking** | Hybrid BM25 + `fastembed` local vectors; better recall on semantically related queries; `fastembed` already an optional dependency |
 | **Graph-aware retrieval** | Traverse wikilink adjacency for multi-hop queries (e.g. "What connects Turing to von Neumann?") |
 | **Larger corpus support** | Sharded BM25 index; incremental embedding updates; streaming ingest for very large documents |
 | **Mistral + Bedrock providers** | Additional OpenAI-compatible endpoints; Bedrock for AWS-native deployments |
-| **Obsidian plugin: web search live view** | Job polling + live result panel — watch pages appear as fan-out jobs complete (basic modal already in v0.1) |
 
 ---
 
@@ -1424,3 +1431,5 @@ synthadoc schedule add --op "scaffold" --cron "0 4 * * 0" -w my-wiki
 - **HTTP 502 on LLM failure** — `/query` GET and POST return 502 Bad Gateway (not raw 500) when the LLM provider is unreachable
 - **Web search decomposition** — `SearchDecomposeAgent` breaks a web search intent into 1–4 focused keyword search strings (separate prompt from query decomposition); parallel Tavily searches; URL deduplication; graceful fallback on LLM error; integrated into `IngestAgent` at the web search fan-out point
 - **New Obsidian commands (8 added, 15 total)** — `Lint: run`, `Lint: run with auto-resolve`, `Jobs: retry dead job...`, `Jobs: purge old completed/dead...`, `Wiki: regenerate scaffold...`, `Audit: ingest history...`, `Audit: cost summary...`, `Audit: query history...`
+- **Vector search + semantic re-ranking** — opt-in hybrid BM25 + local vector search using `BAAI/bge-small-en-v1.5` via `fastembed`; one-time background migration embeds existing pages; BM25 serves during migration; enable with `[search] vector = true`
+- **Obsidian web search live view** — `WebSearchModal` replaced with live-polling panel that shows phase text, pages list, and URL errors in real time; configurable poll interval; modal stays open until all fan-out URL jobs settle; job progress tracked via new `progress` column in `jobs.db`
