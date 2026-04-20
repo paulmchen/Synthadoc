@@ -113,7 +113,7 @@ class SkillAgent:
         return list(self._registry.values())
 
     def detect_skill(self, source: str) -> SkillMeta:
-        s = source.lower()
+        s = source.replace("\\", "/").lower()
         is_url = s.startswith("http://") or s.startswith("https://")
         # Pass 1: extension/prefix match — takes priority over intent matching.
         # For HTTP/HTTPS sources only startswith is checked so that the url skill
@@ -169,7 +169,9 @@ class SkillAgent:
         intent phrase (e.g. 'search for', '搜索', 'browse').  Adding new
         intents to a SKILL.md automatically applies here with no code changes.
         """
-        s = source.lower()
+        # Normalise backslashes before the URL check so that Windows-pasted
+        # URLs like "https:\example.com\path" are not mistakenly path-resolved.
+        s = source.replace("\\", "/").lower()
         if s.startswith(("http://", "https://")):
             return False
         try:
