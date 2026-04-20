@@ -38,7 +38,10 @@ class Orchestrator:
         self._audit  = AuditDB(sd / "audit.db")
         self._cache  = CacheManager(sd / "cache.db")
         self._store  = WikiStorage(wiki_root / "wiki")
-        self._search = HybridSearch(self._store, sd / "embeddings.db")
+        self._search = HybridSearch(
+            self._store, sd / "embeddings.db",
+            search_cfg=self._cfg.search,
+        )
         self._log    = LogWriter(wiki_root / "log.md")
         self._cost   = CostGuard(self._cfg.cost)
         self._hooks  = HookExecutor(self._cfg.hooks)
@@ -49,6 +52,37 @@ class Orchestrator:
         await self._audit.init()
         await self._cache.init()
         self._log_agent_config()
+        if self._cfg.search.vector:
+            await self._search.init_vector()
+            asyncio.create_task(self._run_vector_migration())
+
+    async def _run_vector_migration(self) -> None:
+        """Embed all existing wiki pages not yet in embeddings.db (background task)."""
+        import time
+        if not self._cfg.search.vector or self._search._vector_store is None:
+            return
+        slugs = self._store.list_pages()
+        embedded = set(await self._search._vector_store.list_slugs())
+        to_embed = [s for s in slugs if s not in embedded]
+        if not to_embed:
+            return
+        logger.info(
+            "Vector search enabled — embedding %d existing pages in background (BM25 active)",
+            len(to_embed),
+        )
+        start = time.monotonic()
+        for i, slug in enumerate(to_embed, 1):
+            page = self._store.read_page(slug)
+            if page:
+                text = f"{page.title} {' '.join(page.tags)} {page.content}"
+                await self._search.embed_page(slug, text)
+            if i % 50 == 0:
+                logger.info("Vector migration: %d/%d pages embedded…", i, len(to_embed))
+            await asyncio.sleep(0)
+        logger.info(
+            "Vector migration complete — %d pages, %.0fs",
+            len(to_embed), time.monotonic() - start,
+        )
 
     def _log_agent_config(self) -> None:
         """Log the effective provider/model for each named agent slot at startup."""
@@ -113,6 +147,13 @@ class Orchestrator:
                 "tokens_used": result.tokens_used,
                 "cost_usd": result.cost_usd,
             })
+            # Embed newly written pages for vector search
+            if self._cfg.search.vector:
+                for slug in result.pages_created + result.pages_updated:
+                    page = self._store.read_page(slug)
+                    if page:
+                        text = f"{page.title} {' '.join(page.tags)} {page.content}"
+                        await self._search.embed_page(slug, text)
             self._hooks.fire("on_ingest_complete", {
                 "event": "on_ingest_complete", "wiki": str(self._root),
                 "source": source,
