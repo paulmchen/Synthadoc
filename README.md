@@ -1027,17 +1027,6 @@ Edit `<wiki-root>/AGENTS.md` to give the LLM domain-specific instructions — wh
 
 ---
 
-## What's New in v0.2.0
-
-| Feature | Notes |
-|---------|-------|
-| **Query decomposition** | Complex questions automatically split into focused sub-queries, each retrieved independently then synthesised — compound and comparative questions answered correctly |
-| **Query audit trail** | Every query recorded in `audit.db`; `synthadoc audit queries` and `GET /audit/queries` show question history, sub-question counts, and token costs; `audit cost` now aggregates both ingest and query spend |
-| **Web search decomposition** | `synthadoc ingest "search for: <topic>"` automatically decomposes the topic into focused keyword sub-queries (up to 4), fires parallel Tavily searches, and deduplicates URLs — richer, more targeted pages from a single command |
-| **Knowledge gap detection** | When a query finds too few relevant pages, Synthadoc automatically suggests targeted `synthadoc ingest "search for: ..."` commands to enrich the wiki — shown as an Obsidian callout in both CLI and plugin |
-
----
-
 ## Links
 
 - Design document: [docs/design.md](docs/design.md)

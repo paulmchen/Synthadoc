@@ -1301,10 +1301,13 @@ Target: week of 2026-04-25.
 |---------|--------|-------|
 | **Query decomposition** | ✅ v0.2.0 | Replaces term-extraction with dynamic sub-question decomposition; parallel BM25 retrieval per sub-question; fence-stripping for cross-model JSON robustness |
 | **Query audit trail** | ✅ v0.2.0 | `queries` table in `audit.db`; `record_query()`, `list_queries()`; `cost_summary()` unions ingest + query; HTTP + CLI + Obsidian surfaces |
+| **Per-model cost tracking** | ✅ v0.2.0 | Per-token rate table covers all 5 providers; cost calculated for both ingest and query operations; stored in `audit.db`; `audit cost` CLI and `GET /audit/costs` aggregate across operation types; Ollama records no API cost (local model) |
+| **Knowledge gap detection** | ✅ v0.2.0 | Three-signal scoring (page count, max BM25 score, content overlap); query result carries a gap flag and targeted ingest suggestions when the wiki lacks relevant coverage; shown as an Obsidian callout in plugin and CLI |
 | **BM25 corpus caching** | ✅ v0.2.0 | In-memory corpus cache in `HybridSearch`; invalidated on write; eliminates redundant disk reads on decomposed queries |
 | **OpenAIProvider contract tests** | ✅ v0.2.0 | Covers OpenAI, Gemini, Groq, Ollama (all share `OpenAIProvider`) |
 | **HTTP 502 on LLM failure** | ✅ v0.2.0 | `/query` GET and POST return 502 Bad Gateway (not raw 500) when the LLM provider is unreachable |
 | **Web search decomposition** | ✅ v0.2.0 | `SearchDecomposeAgent` decomposes search intent into N keyword search strings; parallel Tavily API calls via `asyncio.gather`; URL deduplication across results; fallback to single query on LLM error |
+| **New Obsidian commands (8)** | ✅ v0.2.0 | `Lint: run`, `Lint: run with auto-resolve`, `Jobs: retry dead job...`, `Jobs: purge old completed/dead...`, `Wiki: regenerate scaffold...`, `Audit: ingest history...`, `Audit: cost summary...`, `Audit: query history...` — plugin now has 15 commands total (7 in v0.1) |
 
 ### Planned
 
@@ -1414,8 +1417,10 @@ synthadoc schedule add --op "scaffold" --cron "0 4 * * 0" -w my-wiki
 
 - **Query decomposition** — `QueryAgent.decompose()` breaks complex questions into 1–N focused sub-questions (cap=4); parallel BM25 search per sub-question; merged and deduplicated by highest score; graceful fallback on LLM error; markdown fence stripping for cross-model robustness
 - **Query audit trail** — `queries` table in `audit.db`; every query recorded with question text, sub-question count, tokens, cost, timestamp; `cost_summary()` now aggregates ingest + query spend; exposed via `GET /audit/queries`, `synthadoc audit queries`, and Obsidian "Audit: query history..." command
+- **Per-model cost tracking** — per-token rate table covers all 5 providers; cost calculated for both ingest and query operations and stored in `audit.db`; Ollama records no API cost (local model); unknown models use a conservative fallback rate; exposed via `audit cost` CLI and `GET /audit/costs`
+- **Knowledge gap detection** — three independent signals (too few pages, low BM25 max score, low content-overlap page count); query result carries a gap flag and targeted ingest suggestions when the wiki lacks relevant coverage; displayed as an Obsidian callout block in the plugin and CLI output
 - **BM25 in-memory corpus cache** — `HybridSearch._cached_corpus` built once per session, invalidated via `invalidate_index()` after each page write; eliminates N×disk reads on decomposed queries
 - **OpenAIProvider contract tests** — 4 tests covering happy path, system message, null content, and custom `base_url` forwarding; applies to OpenAI, Gemini, Groq, and Ollama (all use `OpenAIProvider`)
 - **HTTP 502 on LLM failure** — `/query` GET and POST return 502 Bad Gateway (not raw 500) when the LLM provider is unreachable
-- **Obsidian plugin: 15 commands** — added `Audit: query history...` command with `QueryHistoryModal`
 - **Web search decomposition** — `SearchDecomposeAgent` breaks a web search intent into 1–4 focused keyword search strings (separate prompt from query decomposition); parallel Tavily searches; URL deduplication; graceful fallback on LLM error; integrated into `IngestAgent` at the web search fan-out point
+- **New Obsidian commands (8 added, 15 total)** — `Lint: run`, `Lint: run with auto-resolve`, `Jobs: retry dead job...`, `Jobs: purge old completed/dead...`, `Wiki: regenerate scaffold...`, `Audit: ingest history...`, `Audit: cost summary...`, `Audit: query history...`
