@@ -82,13 +82,55 @@ class VectorStore:
         return row[0] if row else 0
 
 
-class HybridSearch:
-    """BM25 full-text search with in-memory corpus cache. Vector re-ranking added in a future task."""
+_EMBED_MODEL_NAME = "BAAI/bge-small-en-v1.5"
 
-    def __init__(self, store: WikiStorage, index_path: Path) -> None:
+
+class HybridSearch:
+    """BM25 full-text search with optional vector re-ranking via fastembed."""
+
+    def __init__(self, store: WikiStorage, index_path: Path,
+                 search_cfg=None) -> None:
         self._store = store
         self._index_path = index_path
         self._cached_corpus: Optional[tuple[list[str], list[list[str]]]] = None
+        self._search_cfg = search_cfg      # SearchConfig or None
+        self._vector_store: Optional[VectorStore] = None
+        self._embed_model = None            # lazy loaded
+
+    def _vector_enabled(self) -> bool:
+        return self._search_cfg is not None and self._search_cfg.vector
+
+    async def init_vector(self) -> None:
+        """Create embeddings.db table. Call from orchestrator when vector=true."""
+        if not self._vector_enabled():
+            return
+        self._vector_store = VectorStore(self._index_path)
+        await self._vector_store.init()
+
+    def _get_embed_model(self):
+        if self._embed_model is None:
+            try:
+                from fastembed import TextEmbedding
+            except ImportError:
+                raise ImportError(
+                    "fastembed is required for vector search. "
+                    "Install with: pip install fastembed"
+                )
+            self._embed_model = TextEmbedding(_EMBED_MODEL_NAME)
+        return self._embed_model
+
+    def _embed_text(self, text: str) -> list[float]:
+        model = self._get_embed_model()
+        result = list(model.embed([text[:512]]))
+        return result[0].tolist()
+
+    async def embed_page(self, slug: str, text: str) -> None:
+        """Embed a page and persist in embeddings.db. No-op when vector disabled."""
+        if not self._vector_enabled() or self._vector_store is None:
+            return
+        loop = asyncio.get_running_loop()
+        embedding = await loop.run_in_executor(None, self._embed_text, text)
+        await self._vector_store.upsert(slug, embedding)
 
     @staticmethod
     def _tokenize(text: str) -> list[str]:
@@ -135,6 +177,40 @@ class HybridSearch:
             ))
         return results
 
-    def hybrid_search(self, query_terms: list[str], top_n: int = 10) -> list[SearchResult]:
-        """BM25 for now; vector re-ranking added later."""
-        return self.bm25_search(query_terms, top_n=top_n)
+    async def hybrid_search(self, query_terms: list[str],
+                            top_n: int = 10) -> list[SearchResult]:
+        """BM25 fetch + vector cosine re-rank when enabled; BM25-only otherwise."""
+        top_candidates = (
+            self._search_cfg.vector_top_candidates
+            if self._vector_enabled() and self._search_cfg
+            else top_n
+        )
+        candidates = self.bm25_search(query_terms, top_n=top_candidates)
+
+        if not self._vector_enabled() or self._vector_store is None or not candidates:
+            return candidates[:top_n]
+
+        import numpy as np
+        stored = await self._vector_store.get_all()
+        if not stored:
+            return candidates[:top_n]
+
+        query_text = " ".join(query_terms)
+        loop = asyncio.get_running_loop()
+        query_emb = await loop.run_in_executor(None, self._embed_text, query_text)
+        q_arr = np.array(query_emb, dtype=np.float32)
+        q_norm = np.linalg.norm(q_arr)
+
+        reranked = []
+        for r in candidates:
+            page_emb = stored.get(r.slug)
+            if page_emb is None:
+                reranked.append((r, 0.0))
+                continue
+            p_arr = np.array(page_emb, dtype=np.float32)
+            norm = q_norm * np.linalg.norm(p_arr)
+            cos_sim = float(np.dot(q_arr, p_arr) / norm) if norm > 0 else 0.0
+            reranked.append((r, cos_sim))
+
+        reranked.sort(key=lambda x: x[1], reverse=True)
+        return [r for r, _ in reranked[:top_n]]
