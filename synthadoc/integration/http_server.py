@@ -16,6 +16,34 @@ import re
 logger = logging.getLogger(__name__)
 
 _MAX_BODY_BYTES = 10 * 1024 * 1024  # 10 MB
+
+
+def _classify_llm_error(exc: Exception) -> "HTTPException | None":
+    """Return a meaningful HTTPException for known LLM API error codes, or None."""
+    code = getattr(exc, "status_code", None)
+    if code == 429:
+        msg = str(exc)
+        if "generativelanguage.googleapis.com" in msg or "gemini" in msg.lower():
+            hint = "Gemini free-tier quota exhausted. Wait for the daily reset or switch to Groq."
+        elif "groq" in msg.lower():
+            hint = "Groq rate limit hit. Wait a moment and retry."
+        elif "anthropic" in msg.lower():
+            hint = "Anthropic rate limit hit. Wait a moment and retry."
+        else:
+            hint = "LLM provider rate limit hit. Wait a moment and retry."
+        return HTTPException(
+            status_code=429,
+            detail=(
+                f"LLM quota exceeded (429). {hint} "
+                "To switch providers, edit [agents] in .synthadoc/config.toml and restart the server."
+            ),
+        )
+    if code == 529:
+        return HTTPException(
+            status_code=503,
+            detail="LLM provider temporarily overloaded (529). Retry in a moment.",
+        )
+    return None
 _WORKER_POLL_SECONDS = 2
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 _FM_RE = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
@@ -177,6 +205,10 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
         try:
             result = await app.state.orch.query(q)
         except Exception as exc:
+            known = _classify_llm_error(exc)
+            if known:
+                logger.warning("LLM rate limit during query: %s", exc)
+                raise known from exc
             logger.exception("Query failed")
             raise HTTPException(status_code=502, detail="LLM provider unavailable") from exc
         return {
@@ -191,6 +223,10 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
         try:
             result = await app.state.orch.query(req.question)
         except Exception as exc:
+            known = _classify_llm_error(exc)
+            if known:
+                logger.warning("LLM rate limit during query: %s", exc)
+                raise known from exc
             logger.exception("Query failed")
             raise HTTPException(status_code=502, detail="LLM provider unavailable") from exc
         return {
