@@ -548,11 +548,14 @@ class WebSearchModal extends Modal {
                     childJobIds = job.result.child_job_ids;
                 }
 
-                if (phase === "searching" && !isDone) {
-                    statusEl.setText("Searching the web…");
-                } else if (phase === "found_urls" && !isDone) {
-                    const total = job.progress?.total ?? 0;
-                    statusEl.setText(`Found ${total} URL${total !== 1 ? "s" : ""} — ingesting…`);
+                // Phase status — only shown while parent is still running
+                if (!isDone) {
+                    if (phase === "searching") {
+                        statusEl.setText("Searching the web…");
+                    } else if (phase === "found_urls") {
+                        const total = job.progress?.total ?? 0;
+                        statusEl.setText(`Found ${total} URL${total !== 1 ? "s" : ""} — ingesting…`);
+                    }
                 }
 
                 if (childJobIds.length > 0) {
@@ -570,9 +573,10 @@ class WebSearchModal extends Modal {
                             if (!errors.includes(msg)) errors.push(msg);
                         }
                     }
-
-                    if (!isDone) {
-                        statusEl.setText(`Ingesting ${childJobIds.length} URL${childJobIds.length !== 1 ? "s" : ""}… (${childDone} done)`);
+                    // Always show ingesting progress once child jobs are known
+                    const settled = childDone + errors.length;
+                    if (settled < childJobIds.length) {
+                        statusEl.setText(`Ingesting ${childJobIds.length} URL${childJobIds.length !== 1 ? "s" : ""}… (${settled} done)`);
                     }
                 }
 
