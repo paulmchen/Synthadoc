@@ -2,11 +2,13 @@
 # Copyright (C) 2026 Paul Chen / axoviq.com
 from __future__ import annotations
 
+import asyncio
 import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
+import aiosqlite
 from rank_bm25 import BM25Okapi
 
 from synthadoc.storage.wiki import WikiStorage
@@ -18,6 +20,66 @@ class SearchResult:
     score: float
     title: str
     snippet: str
+
+
+class VectorStore:
+    """SQLite-backed store for page embeddings (float32 blobs)."""
+
+    def __init__(self, db_path: Path) -> None:
+        self._path = Path(db_path)
+        self._path.parent.mkdir(parents=True, exist_ok=True)
+
+    async def init(self) -> None:
+        async with aiosqlite.connect(self._path) as db:
+            await db.execute("""
+                CREATE TABLE IF NOT EXISTS embeddings (
+                    slug       TEXT PRIMARY KEY,
+                    embedding  BLOB NOT NULL,
+                    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+                )
+            """)
+            await db.commit()
+
+    async def upsert(self, slug: str, embedding: list[float]) -> None:
+        import numpy as np
+        blob = np.array(embedding, dtype=np.float32).tobytes()
+        async with aiosqlite.connect(self._path) as db:
+            await db.execute(
+                "INSERT OR REPLACE INTO embeddings (slug, embedding, updated_at)"
+                " VALUES (?, ?, datetime('now'))",
+                (slug, blob),
+            )
+            await db.commit()
+
+    async def get(self, slug: str) -> "Optional[list[float]]":
+        import numpy as np
+        async with aiosqlite.connect(self._path) as db:
+            async with db.execute(
+                "SELECT embedding FROM embeddings WHERE slug=?", (slug,)
+            ) as cur:
+                row = await cur.fetchone()
+        if row is None:
+            return None
+        return np.frombuffer(row[0], dtype=np.float32).tolist()
+
+    async def get_all(self) -> "dict[str, list[float]]":
+        import numpy as np
+        async with aiosqlite.connect(self._path) as db:
+            async with db.execute("SELECT slug, embedding FROM embeddings") as cur:
+                rows = await cur.fetchall()
+        return {r[0]: np.frombuffer(r[1], dtype=np.float32).tolist() for r in rows}
+
+    async def list_slugs(self) -> list[str]:
+        async with aiosqlite.connect(self._path) as db:
+            async with db.execute("SELECT slug FROM embeddings") as cur:
+                rows = await cur.fetchall()
+        return [r[0] for r in rows]
+
+    async def count(self) -> int:
+        async with aiosqlite.connect(self._path) as db:
+            async with db.execute("SELECT COUNT(*) FROM embeddings") as cur:
+                row = await cur.fetchone()
+        return row[0] if row else 0
 
 
 class HybridSearch:

@@ -1,5 +1,6 @@
 # SPDX-License-Identifier: AGPL-3.0-or-later
 # Copyright (C) 2026 Paul Chen / axoviq.com
+import pytest
 from synthadoc.storage.wiki import WikiStorage, WikiPage
 from synthadoc.storage.search import HybridSearch
 
@@ -139,3 +140,92 @@ def test_corpus_repopulated_after_invalidation(tmp_wiki):
     results = search.bm25_search(["nitrogen"], top_n=5)
     assert search._cached_corpus is not None
     assert "nitrogen" in [r.slug for r in results]
+
+
+# ── VectorStore tests ─────────────────────────────────────────────────────────
+
+import pytest
+
+@pytest.mark.asyncio
+async def test_vector_store_upsert_and_get(tmp_wiki):
+    from synthadoc.storage.search import VectorStore
+    store = VectorStore(tmp_wiki / ".synthadoc" / "embeddings.db")
+    await store.init()
+    emb = [0.1, 0.2, 0.3, 0.4]
+    await store.upsert("my-page", emb)
+    result = await store.get("my-page")
+    assert result is not None
+    assert len(result) == 4
+    assert abs(result[0] - 0.1) < 1e-5
+
+@pytest.mark.asyncio
+async def test_vector_store_get_missing_returns_none(tmp_wiki):
+    from synthadoc.storage.search import VectorStore
+    store = VectorStore(tmp_wiki / ".synthadoc" / "embeddings.db")
+    await store.init()
+    assert await store.get("nonexistent") is None
+
+@pytest.mark.asyncio
+async def test_vector_store_list_slugs(tmp_wiki):
+    from synthadoc.storage.search import VectorStore
+    store = VectorStore(tmp_wiki / ".synthadoc" / "embeddings.db")
+    await store.init()
+    await store.upsert("page-a", [0.1, 0.2])
+    await store.upsert("page-b", [0.3, 0.4])
+    slugs = await store.list_slugs()
+    assert set(slugs) == {"page-a", "page-b"}
+
+@pytest.mark.asyncio
+async def test_vector_store_upsert_overwrites(tmp_wiki):
+    from synthadoc.storage.search import VectorStore
+    store = VectorStore(tmp_wiki / ".synthadoc" / "embeddings.db")
+    await store.init()
+    await store.upsert("page-a", [0.1, 0.2])
+    await store.upsert("page-a", [0.9, 0.8])
+    result = await store.get("page-a")
+    assert abs(result[0] - 0.9) < 1e-5
+
+@pytest.mark.asyncio
+async def test_vector_store_get_all(tmp_wiki):
+    from synthadoc.storage.search import VectorStore
+    store = VectorStore(tmp_wiki / ".synthadoc" / "embeddings.db")
+    await store.init()
+    await store.upsert("a", [1.0, 0.0])
+    await store.upsert("b", [0.0, 1.0])
+    all_embs = await store.get_all()
+    assert set(all_embs.keys()) == {"a", "b"}
+    assert len(all_embs["a"]) == 2
+
+@pytest.mark.asyncio
+async def test_vector_store_count(tmp_wiki):
+    from synthadoc.storage.search import VectorStore
+    store = VectorStore(tmp_wiki / ".synthadoc" / "embeddings.db")
+    await store.init()
+    assert await store.count() == 0
+    await store.upsert("x", [0.5, 0.5])
+    assert await store.count() == 1
+    await store.upsert("y", [0.1, 0.9])
+    assert await store.count() == 2
+
+@pytest.mark.asyncio
+async def test_vector_store_get_all_empty(tmp_wiki):
+    from synthadoc.storage.search import VectorStore
+    store = VectorStore(tmp_wiki / ".synthadoc" / "embeddings.db")
+    await store.init()
+    result = await store.get_all()
+    assert result == {}
+
+@pytest.mark.asyncio
+async def test_vector_store_list_slugs_empty(tmp_wiki):
+    from synthadoc.storage.search import VectorStore
+    store = VectorStore(tmp_wiki / ".synthadoc" / "embeddings.db")
+    await store.init()
+    assert await store.list_slugs() == []
+
+@pytest.mark.asyncio
+async def test_vector_store_init_idempotent(tmp_wiki):
+    from synthadoc.storage.search import VectorStore
+    store = VectorStore(tmp_wiki / ".synthadoc" / "embeddings.db")
+    await store.init()
+    await store.init()  # second call must not crash
+    assert await store.count() == 0
