@@ -116,12 +116,22 @@ class AnalyseRequest(BaseModel):
         return v
 
 
+def _parse_retry_after(exc: Exception, default: float = 60.0) -> float:
+    """Parse 'Please try again in Xm Y.Zs' from a rate-limit error message."""
+    import re
+    m = re.search(r"Please try again in (?:(\d+)m\s*)?(\d+(?:\.\d+)?)s", str(exc))
+    if m:
+        return float(m.group(1) or 0) * 60 + float(m.group(2))
+    return default
+
+
 async def _worker_loop(orch) -> None:
     """Background task: poll jobs.db and execute pending jobs."""
-    from synthadoc.core.queue import JobStatus
+    sleep_secs = _WORKER_POLL_SECONDS
     while True:
         try:
             job = await orch.queue.dequeue()
+            sleep_secs = _WORKER_POLL_SECONDS  # reset after a successful dequeue
             if job:
                 if job.operation == "ingest":
                     source = job.payload.get("source", "")
@@ -134,10 +144,22 @@ async def _worker_loop(orch) -> None:
                 elif job.operation == "scaffold":
                     domain = job.payload.get("domain", "")
                     await orch._run_scaffold(job.id, domain=domain)
-        except Exception:
-            logger.exception("Worker loop error — job recorded in jobs.db; continuing")
+        except Exception as exc:
+            known = _classify_llm_error(exc)
+            if known and known.status_code == 429:
+                sleep_secs = _parse_retry_after(exc)
+                logger.warning(
+                    "Rate limit hit in worker — pausing %.0f s before next job. "
+                    "(%d pending jobs will wait.) %s",
+                    sleep_secs,
+                    len([j for j in asyncio.all_tasks() if not j.done()]),
+                    known.detail,
+                )
+            else:
+                logger.exception("Worker loop error — job recorded in jobs.db; continuing")
+                sleep_secs = _WORKER_POLL_SECONDS
 
-        await asyncio.sleep(_WORKER_POLL_SECONDS)
+        await asyncio.sleep(sleep_secs)
 
 
 def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAPI:

@@ -942,7 +942,7 @@ never requires re-ingesting anything.
 
 | Provider    | Key env var         | Free tier                  |
 | ----------- | ------------------- | -------------------------- |
-| `groq`      | `GROQ_API_KEY`      | **Yes — default** · fast Llama models, generous daily quota |
+| `groq`      | `GROQ_API_KEY`      | **Yes — default** · fast Llama models, 100K tokens/day      |
 | `gemini`    | `GEMINI_API_KEY`    | Yes — 15 RPM / 1M tokens per day                           |
 | `ollama`    | _(none)_            | Yes — fully local, no rate limits                           |
 | `anthropic` | `ANTHROPIC_API_KEY` | No — pay-per-token, highest quality                         |
@@ -1047,6 +1047,12 @@ default = { provider = "groq", model = "llama-3.3-70b-versatile" }
 ```
 
 Restart `synthadoc serve`. The banner will confirm `LLM: groq/llama-3.3-70b-versatile`.
+
+> **Groq free tier limits:** 100,000 tokens per day for `llama-3.3-70b-versatile`. A
+> web search ingest fans out to ~20 URLs, each costing ~1,200 tokens — four web searches
+> can exhaust the daily quota. For heavier use, switch to Gemini (1M tokens/day) or add
+> a Groq billing method at console.groq.com. The server backs off automatically when the
+> quota is hit and resumes processing once the window resets.
 
 ---
 
