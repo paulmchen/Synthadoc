@@ -131,7 +131,7 @@ The filename without extension, derived from the page title. ASCII-safe and CJK-
 
 ### Component Map
 
-![Synthadoc Architecture](architecture.png)
+![Synthadoc Architecture](png/architecture.png)
 
 ### Request lifecycle (ingest via CLI)
 
