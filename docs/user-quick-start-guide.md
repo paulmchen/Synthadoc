@@ -49,7 +49,7 @@ Expected output:
 
 ```
 Wiki:         /home/user/wikis/history-of-computing
-Pages:        10
+Pages:        12
 Jobs pending: 0
 Jobs total:   0
 ```
@@ -71,8 +71,7 @@ synthadoc serve -w history-of-computing
 synthadoc serve -w history-of-computing --background
 ```
 
-<!-- SCREENSHOT: synthadoc serve startup banner showing port, wiki path, LLM provider/model, and PID -->
-> **Screenshot placeholder:** server startup banner
+![synthadoc serve startup banner](png/synthadoc-serve.png)
 
 The banner confirms the port, wiki path, active LLM provider/model, and PID. If you see
 `Warning: TAVILY_API_KEY is not set`, web search (Step 9) will not work — see
@@ -91,6 +90,17 @@ on your machine. Synthadoc writes its wiki pages in Obsidian-compatible format, 
 can browse and search the wiki without any tool running.
 
 **Obsidian must already be installed** — download from **[obsidian.md](https://obsidian.md)** if not.
+
+### Open the vault
+
+In Obsidian: **Open folder as vault** → select the installed wiki folder:
+
+- **Windows:** `%USERPROFILE%\wikis\history-of-computing`
+- **Linux / macOS:** `~/wikis/history-of-computing`
+
+> **Tip — show all file types in the explorer:** By default Obsidian hides file types it
+> does not natively understand (`.xlsx`, `.pptx`, etc.). To show them: **Settings →
+> Files and links → Show all file types → on**. The engine reads them regardless.
 
 **Dataview** is an Obsidian community plugin that provides SQL-like live queries over
 YAML frontmatter. The Synthadoc dashboard (`wiki/dashboard.md`) uses it to display
@@ -111,17 +121,6 @@ contradicted pages and orphans in real time.
 ---
 
 ## Step 3 — Install the Synthadoc plugin and open the vault
-
-### Open the vault
-
-In Obsidian: **Open folder as vault** → select the installed wiki folder:
-
-- **Windows:** `%USERPROFILE%\wikis\history-of-computing`
-- **Linux / macOS:** `~/wikis/history-of-computing`
-
-> **Tip — show all file types in the explorer:** By default Obsidian hides file types it
-> does not natively understand (`.xlsx`, `.pptx`, etc.). To show them: **Settings →
-> Files and links → Show all file types → on**. The engine reads them regardless.
 
 ### Install the Synthadoc plugin
 
@@ -159,12 +158,13 @@ copy manifest.json "%USERPROFILE%\wikis\history-of-computing\.obsidian\plugins\s
 The **Synthadoc ribbon icon** (book icon on the far-left sidebar) confirms the plugin is
 active. Clicking it shows the live page count and server health.
 
+![Synthadoc ribbon icon](png/synthadoc-ribbon-icon.png)
+
 All Synthadoc commands are also reachable via the Command Palette (`Ctrl/Cmd+P` → type
 `Synthadoc`). For the full command reference see
 [Appendix A — Obsidian Plugin Command Reference](#appendix-a--obsidian-plugin-command-reference).
 
-<!-- SCREENSHOT: Obsidian with vault open, ribbon icon visible, Graph View showing 10 interconnected nodes -->
-> **Screenshot placeholder:** Obsidian vault with pre-built wiki and ribbon icon
+![Obsidian vault with pre-built wiki](png/synthadoc-vault-demo.png)
 
 ---
 
@@ -204,8 +204,7 @@ history-of-computing/
 **Graph view** (`Ctrl/Cmd+G`): the 10 pre-built pages should appear as interconnected
 nodes. `index` and `dashboard` connect to everything; topic pages cluster by cross-links.
 
-<!-- SCREENSHOT: Obsidian Graph View showing 10 pre-built pages with wikilink edges -->
-> **Screenshot placeholder:** Obsidian Graph View — pre-built wiki
+![Obsidian Graph View — pre-built wiki](png/synthadoc-graph-view.png)
 
 ---
 
@@ -269,8 +268,7 @@ Your wiki doesn't have enough on this topic yet. Enrich it with a web search:
 The suggested search strings are generated automatically. Run one of the suggestions
 after Step 9 to fill the gap.
 
-<!-- SCREENSHOT: CLI terminal showing a query result with citations + a knowledge gap callout -->
-> **Screenshot placeholder:** CLI query result with knowledge gap callout
+![CLI query result with knowledge gap callout](png/cli-gap-detection.png)
 
 ### Query from Obsidian
 
@@ -278,8 +276,7 @@ Open the Command Palette (`Ctrl/Cmd+P`) → `Synthadoc: Query: ask the wiki...` 
 question → press `Ctrl/Cmd+Enter`. The answer appears in a responsive modal with
 clickable `[[wikilinks]]`.
 
-<!-- SCREENSHOT: Obsidian Query modal with answer and citation wikilinks -->
-> **Screenshot placeholder:** Obsidian query modal with answer
+![Obsidian query modal with answer](png/ui-gap-detection.png)
 
 ---
 
@@ -312,8 +309,7 @@ Both enqueue one job per file. Watch them:
 synthadoc jobs list -w history-of-computing
 ```
 
-<!-- SCREENSHOT: `synthadoc jobs list` terminal output showing all 6 jobs in progress -->
-> **Screenshot placeholder:** jobs list terminal output
+![synthadoc jobs list terminal output](png/job-list-terminal.png)
 
 Wait until all six show `completed`. Filter by status if needed:
 
@@ -329,8 +325,7 @@ Or from Obsidian: Command Palette → `Synthadoc: Jobs: list...` → use the fil
 Once all jobs complete, open **Graph view** (`Ctrl/Cmd+G`) — new nodes appear for the
 ingested topics and link into the existing graph.
 
-<!-- SCREENSHOT: Obsidian Graph View after batch ingest — more nodes and denser wikilink graph -->
-> **Screenshot placeholder:** Graph View after batch ingest
+![Obsidian Graph View after batch ingest](png/synthadoc-graph-after.png)
 
 Run a few queries that use the new content:
 
@@ -370,8 +365,7 @@ Contradicted pages (1) - need review:
 **In Obsidian:** open `wiki/dashboard.md` — `grace-hopper` appears in the
 **Contradicted pages** Dataview table. The Properties panel shows `status: contradicted`.
 
-<!-- SCREENSHOT: Obsidian dashboard showing grace-hopper in the Contradicted pages table -->
-> **Screenshot placeholder:** dashboard with contradiction
+![Dashboard showing contradicted page](png/synthadoc-wiki-conflict.png)
 
 ### Option 1 — Manual resolution (recommended first time)
 
@@ -428,8 +422,6 @@ Dataview table.
 > connected. Synthadoc defines an orphan as having **no inbound links** — always use
 > `synthadoc lint report` as the authoritative check.
 
-<!-- SCREENSHOT: Obsidian dashboard showing konrad-zuse in the Orphan pages table -->
-> **Screenshot placeholder:** dashboard with orphan page
 
 ### Option 1 — Link it (recommended)
 
@@ -545,8 +537,7 @@ The modal transitions to a live view:
 - **Errors** (blocked domains, 404s) appear in red
 - **Done — N page(s) written.** when all jobs settle
 
-<!-- SCREENSHOT: Obsidian web search live view modal showing pages appearing in real time -->
-> **Screenshot placeholder:** Obsidian web search live view (v0.2.0)
+![Obsidian web search live view](png/synthadoc-search-live-view.png)
 
 The modal prepends `search for:` automatically — just type the topic, no prefix needed.
 
@@ -582,8 +573,6 @@ Open `wiki/index.md` in Obsidian — it now has richer category headings that re
 full post-ingest wiki (e.g. **Pioneers and Visionaries**, **Hardware Milestones**,
 **Software and Languages**, **European Computing**, **Emerging Technology**).
 
-<!-- SCREENSHOT: wiki/index.md open in Obsidian showing scaffold-generated category structure with wikilinks -->
-> **Screenshot placeholder:** index.md after scaffold — category structure with wikilinks
 
 ### Re-run scaffold at any time
 
@@ -619,8 +608,7 @@ synthadoc audit history -w history-of-computing
 Shows the last 50 ingest records: timestamp, source file, wiki pages created/updated,
 token count, and cost. Use `-n N` for more records and `--json` for machine-readable output.
 
-<!-- SCREENSHOT: `synthadoc audit history` terminal output showing source → page mapping with tokens and cost -->
-> **Screenshot placeholder:** audit history output
+![synthadoc audit history output](png/synthadoc-audit-history.png)
 
 ### Cost summary
 
@@ -640,8 +628,7 @@ Avg cost/source  : $0.024
 
 Pass `--days 7` for a weekly view. Per-model cost tracking is fully live in v0.2.0.
 
-<!-- SCREENSHOT: `synthadoc audit cost` output showing token totals and daily breakdown -->
-> **Screenshot placeholder:** audit cost output
+![synthadoc audit cost output](png/synthadoc-audit-cost.png)
 
 ### Query history
 
@@ -706,9 +693,6 @@ sched-a3f1b2c4  0 2 * * *  ingest --batch raw_sources/ -w history-of-computing
 sched-b7e9d012  0 3 * * 0  lint run -w history-of-computing
 sched-c9f3e201  0 4 * * 0  scaffold -w history-of-computing
 ```
-
-<!-- SCREENSHOT: `synthadoc schedule list` output showing three registered scheduled jobs -->
-> **Screenshot placeholder:** schedule list output
 
 ### Clean up (demo only)
 

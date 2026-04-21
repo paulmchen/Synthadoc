@@ -151,7 +151,7 @@ RAG chunks documents and retrieves them at query time. Synthadoc **compiles** kn
 
 ## Architecture
 
-![Synthadoc Architecture](docs/architecture.png)
+![Synthadoc Architecture](docs/png/architecture.png)
 
 For full architecture details, data models, API reference, and plugin development guide see **[docs/design.md](docs/design.md)**.
 
@@ -301,7 +301,7 @@ The PID is printed when the background server starts and saved to `<wiki-root>/.
 
 ## Quick-Start Guide
 
-The **History of Computing** demo includes 10 pre-built pages, raw source files covering clean-merge, contradiction, and orphan scenarios, and a full walkthrough of every Synthadoc feature.
+The **History of Computing** demo includes 10 pre-built pages, raw source files covering clean-merge, contradiction, and orphan scenarios, and a full walkthrough of key Synthadoc feature.
 
 **Full step-by-step walkthrough: [docs/user-quick-start-guide.md](docs/user-quick-start-guide.md)**
 
@@ -315,8 +315,8 @@ The guide covers:
 7. Resolve a contradiction
 8. Fix an orphan page
 9. Web search ingestion with automatic decomposition
-10. Enrich the wiki with scaffold (regenerate index, purpose, AGENTS.md)
-11. Audit features (cost, history, events)
+10. Enrich the wiki with scaffold (regenerate/update index, purpose, AGENTS.md)
+11. Audit features (token cost, history, events)
 12. Schedule recurring operations
 
 ---
