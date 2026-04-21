@@ -180,6 +180,17 @@ class JobQueue:
             )
             await db.commit()
 
+    async def cancel_pending(self) -> int:
+        """Mark all pending jobs as skipped. Returns the number of jobs cancelled."""
+        async with aiosqlite.connect(self._path) as db:
+            async with db.execute("SELECT COUNT(*) FROM jobs WHERE status='pending'") as cur:
+                count = (await cur.fetchone())[0]
+            await db.execute(
+                "UPDATE jobs SET status='skipped', error='cancelled by user' WHERE status='pending'"
+            )
+            await db.commit()
+        return count
+
     async def purge(self, older_than_days: int) -> int:
         async with aiosqlite.connect(self._path) as db:
             async with db.execute(

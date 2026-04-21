@@ -406,6 +406,11 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
         await app.state.orch.queue.retry(job_id)
         return {"retried": job_id}
 
+    @app.post("/jobs/cancel-pending")
+    async def cancel_pending_jobs():
+        count = await app.state.orch.queue.cancel_pending()
+        return {"cancelled": count}
+
     @app.delete("/jobs")
     async def purge_jobs(older_than: int = 7):
         count = await app.state.orch.queue.purge(older_than_days=older_than)
