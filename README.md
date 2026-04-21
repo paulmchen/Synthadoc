@@ -628,6 +628,9 @@ synthadoc ingest --force report.pdf -w my-wiki
 synthadoc ingest "search for: Bank of Canada interest rate decisions 2024" -w my-wiki
 synthadoc ingest "find on the web: unemployment trends Ontario Q1 2025" -w my-wiki
 
+# Limit how many URLs are enqueued (default 20, overrides [web_search] max_results)
+synthadoc ingest "search for: quantum computing basics" --max-results 5 -w my-wiki
+
 # Multiple web searches at once via a manifest file
 # web-searches.txt:
 #   search for: Bank of Canada interest rate decisions 2024
@@ -678,6 +681,10 @@ synthadoc jobs status <job-id> -w my-wiki
 
 # Retry a dead job
 synthadoc jobs retry <job-id> -w my-wiki
+
+# Cancel all pending jobs at once (e.g. after a bad batch ingest)
+synthadoc jobs cancel -w my-wiki        # prompts for confirmation
+synthadoc jobs cancel --yes -w my-wiki  # skip confirmation
 
 # Remove old records
 synthadoc jobs purge --older-than 30 -w my-wiki

@@ -580,7 +580,7 @@ Reload the plugin (toggle off/on) after copying — a full Obsidian restart is n
 | `Synthadoc: Run lint` | Queues a lint job; shows a notice with contradiction + orphan counts when complete |
 | `Synthadoc: Run lint with auto-resolve` | Same as above but passes `auto_resolve: true` — LLM resolves contradictions automatically when confidence ≥ threshold |
 | `Synthadoc: List jobs...` | Modal with status-filter dropdown, results table, error details |
-| `Synthadoc: Web search...` | Live-polling modal — type a plain topic; shows phase text, pages list, and URL errors in real time as fan-out jobs complete; configurable poll interval (500–10000 ms, default 2000 ms) |
+| `Synthadoc: Web search...` | Live-polling modal — type a plain topic; set max results (1–50, default 20) and poll interval (500–10000 ms, default 2000 ms); shows phase text, pages list, and URL errors in real time as fan-out jobs complete |
 
 ### Ribbon icon
 
@@ -620,7 +620,7 @@ synthadoc
 ├── scaffold [-w wiki]
 ├── demo list
 ├── serve [-w wiki] [--port N] [--background] [--mcp-only] [--http-only] [--verbose]
-├── ingest <source> [-w wiki] [--batch] [--file manifest] [--force] [--analyse-only]
+├── ingest <source> [-w wiki] [--batch] [--file manifest] [--force] [--analyse-only] [--max-results N]
 ├── query "<question>" [-w wiki] [--save]
 ├── lint
 │   ├── run [-w wiki] [--scope contradictions|orphans|all] [--auto-resolve]
@@ -630,6 +630,7 @@ synthadoc
 │   ├── status <id> [-w wiki]
 │   ├── retry <id> [-w wiki]
 │   ├── delete <id> [-w wiki]
+│   ├── cancel [-w wiki] [--yes]
 │   └── purge --older-than <days> [-w wiki]
 ├── audit
 │   ├── history [-w wiki] [--limit N] [--json]   — ingest records: timestamp, source, page, tokens, cost
@@ -1317,6 +1318,11 @@ Target: week of 2026-04-25.
 | **New Obsidian commands (8)** | ✅ v0.2.0 | `Lint: run`, `Lint: run with auto-resolve`, `Jobs: retry dead job...`, `Jobs: purge old completed/dead...`, `Wiki: regenerate scaffold...`, `Audit: ingest history...`, `Audit: cost summary...`, `Audit: query history...` — plugin now has 15 commands total (7 in v0.1) |
 | **Vector search + semantic re-ranking** | ✅ v0.2.0 | Opt-in hybrid BM25 + local vector search; `BAAI/bge-small-en-v1.5` model via `fastembed` (~130 MB, downloaded once); BM25 fetches `vector_top_candidates` (default 20) candidates, cosine similarity re-ranks to `top_n` (default 8); one-time background migration at server start embeds all existing pages; BM25 serves during migration; enable with `vector = true` in `[search]` config |
 | **Obsidian web search live view** | ✅ v0.2.0 | `WebSearchModal` replaced with live-polling panel; shows phase text ("Searching the web…", "Found N URLs — ingesting…"), live pages list, and URL errors as child jobs complete; configurable poll interval (500–10000 ms, default 2000 ms); modal stays open until done |
+| **Web search URL cap (`--max-results`)** | ✅ v0.2.0 | `synthadoc ingest "search for: …" --max-results N` limits total URLs enqueued (default 20, config: `[web_search] max_results`); Obsidian modal exposes the same control as a numeric input (range 1–50); cap applied after sub-query dedup, so N is the true total |
+| **Image ingest for OpenAI-compatible providers** | ✅ v0.2.0 | `OpenAIProvider` converts Anthropic base64 image blocks to OpenAI `image_url` format before sending; Groq declared non-vision via `supports_vision = False`; image sources routed to Groq receive `fail_permanent` with a clear error message |
+| **Job crash recovery** | ✅ v0.2.0 | `in_progress` jobs left by a crashed server session are reset to `pending` on the next `init()` call, so they are picked up automatically after a restart |
+| **Rate-limit requeue (no retry burn)** | ✅ v0.2.0 | HTTP 429 responses from any LLM provider are detected via `status_code` attribute; the job is requeued via `requeue()` (retry counter unchanged) rather than `fail()`, preserving the retry budget for real errors |
+| **Bulk cancel pending jobs** | ✅ v0.2.0 | `synthadoc jobs cancel [-w wiki] [--yes]` marks all pending jobs as `skipped` in one operation; also exposed as `POST /jobs/cancel-pending`; returns cancelled count |
 
 ### Planned
 
@@ -1433,3 +1439,8 @@ synthadoc schedule add --op "scaffold" --cron "0 4 * * 0" -w my-wiki
 - **New Obsidian commands (8 added, 15 total)** — `Lint: run`, `Lint: run with auto-resolve`, `Jobs: retry dead job...`, `Jobs: purge old completed/dead...`, `Wiki: regenerate scaffold...`, `Audit: ingest history...`, `Audit: cost summary...`, `Audit: query history...`
 - **Vector search + semantic re-ranking** — opt-in hybrid BM25 + local vector search using `BAAI/bge-small-en-v1.5` via `fastembed`; one-time background migration embeds existing pages; BM25 serves during migration; enable with `[search] vector = true`
 - **Obsidian web search live view** — `WebSearchModal` replaced with live-polling panel that shows phase text, pages list, and URL errors in real time; configurable poll interval; modal stays open until all fan-out URL jobs settle; job progress tracked via new `progress` column in `jobs.db`
+- **Web search URL cap** — `synthadoc ingest "search for: …" --max-results N` limits total URLs enqueued across all sub-queries; Obsidian modal exposes the same as a numeric input (1–50, default 20); cap applied after dedup
+- **Image ingest for OpenAI-compatible providers** — `OpenAIProvider` auto-converts Anthropic image blocks to OpenAI `image_url` format; Groq flagged as non-vision (`supports_vision = False`); image jobs routed to Groq get `fail_permanent` with a clear message
+- **Job crash recovery** — `in_progress` jobs are reset to `pending` on server `init()`, so all pending work resumes automatically after a restart
+- **Rate-limit requeue** — HTTP 429 responses from any LLM provider are detected and requeued via `requeue()` (retry counter unchanged), preserving the retry budget for real errors
+- **Bulk cancel (`jobs cancel`)** — `synthadoc jobs cancel [-w wiki] [--yes]` marks all pending jobs as `skipped` in one operation; also `POST /jobs/cancel-pending`
