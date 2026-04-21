@@ -54,8 +54,15 @@ class Orchestrator:
         self._log_agent_config()
         if self._cfg.search.vector:
             logger.info("Vector search: enabled (model: BAAI/bge-small-en-v1.5) — initialising…")
-            await self._search.init_vector()
-            asyncio.create_task(self._run_vector_migration())
+            try:
+                await self._search.init_vector()
+                asyncio.create_task(self._run_vector_migration())
+            except ImportError:
+                logger.warning(
+                    "Vector search requires 'fastembed' which is not installed. "
+                    "Run: pip install fastembed  then restart the server. "
+                    "Falling back to BM25 search."
+                )
 
     async def _run_vector_migration(self) -> None:
         """Embed all existing wiki pages not yet in embeddings.db (background task)."""
