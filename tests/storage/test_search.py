@@ -233,7 +233,7 @@ async def test_vector_store_init_idempotent(tmp_wiki):
 
 # ── HybridSearch vector support tests ────────────────────────────────────────
 
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 @pytest.mark.asyncio
 async def test_hybrid_search_bm25_only_when_vector_disabled(tmp_wiki):
@@ -269,7 +269,8 @@ async def test_hybrid_search_reranks_with_vector(tmp_wiki):
 
     cfg = SearchConfig(vector=True, vector_top_candidates=10)
     search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db", search_cfg=cfg)
-    await search.init_vector()
+    with patch.dict("sys.modules", {"fastembed": MagicMock()}):
+        await search.init_vector()
 
     vs = VectorStore(tmp_wiki / ".synthadoc" / "embeddings.db")
     await vs.upsert("transformers", [1.0, 0.0, 0.0, 0.0])
@@ -294,7 +295,8 @@ async def test_hybrid_search_falls_back_to_bm25_when_no_embeddings(tmp_wiki):
 
     cfg = SearchConfig(vector=True, vector_top_candidates=10)
     search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db", search_cfg=cfg)
-    await search.init_vector()
+    with patch.dict("sys.modules", {"fastembed": MagicMock()}):
+        await search.init_vector()
     # embeddings.db is empty — hybrid_search must fall back to BM25 without calling _embed_text
     results = await search.hybrid_search(["attention", "transformer"], top_n=3)
     assert any(r.slug == "transformers" for r in results)
@@ -306,7 +308,8 @@ async def test_embed_page_stores_embedding(tmp_wiki):
     store = WikiStorage(tmp_wiki / "wiki")
     cfg = SearchConfig(vector=True)
     search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db", search_cfg=cfg)
-    await search.init_vector()
+    with patch.dict("sys.modules", {"fastembed": MagicMock()}):
+        await search.init_vector()
 
     with patch.object(search, "_embed_text", return_value=[0.5, 0.5, 0.0, 0.0]):
         await search.embed_page("my-page", "some text content")

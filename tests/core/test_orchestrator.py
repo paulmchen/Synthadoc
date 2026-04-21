@@ -98,8 +98,8 @@ async def test_vector_migration_embeds_existing_pages(tmp_wiki):
         search=SearchConfig(vector=True),
     )
     orch = Orchestrator(wiki_root=tmp_wiki, config=cfg)
-    # init_vector so _vector_store is wired up
-    await orch._search.init_vector()
+    with patch.dict("sys.modules", {"fastembed": MagicMock()}):
+        await orch._search.init_vector()
 
     with patch.object(orch._search, "_embed_text", return_value=[0.1, 0.2, 0.3, 0.4]):
         await orch._run_vector_migration()
@@ -130,7 +130,8 @@ async def test_vector_migration_skips_already_embedded(tmp_wiki):
         search=SearchConfig(vector=True),
     )
     orch = Orchestrator(wiki_root=tmp_wiki, config=cfg)
-    await orch._search.init_vector()
+    with patch.dict("sys.modules", {"fastembed": MagicMock()}):
+        await orch._search.init_vector()
 
     # Pre-populate embeddings
     vs = VectorStore(tmp_wiki / ".synthadoc" / "embeddings.db")

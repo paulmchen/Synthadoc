@@ -104,6 +104,13 @@ class HybridSearch:
         """Create embeddings.db table. Call from orchestrator when vector=true."""
         if not self._vector_enabled():
             return
+        try:
+            from fastembed import TextEmbedding  # noqa: F401
+        except ImportError:
+            raise ImportError(
+                "fastembed is required for vector search. "
+                "Run: pip install fastembed  then restart the server."
+            )
         self._vector_store = VectorStore(self._index_path)
         await self._vector_store.init()
 
