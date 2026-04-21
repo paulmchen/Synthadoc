@@ -281,3 +281,63 @@ async def test_dequeued_job_has_progress_field(tmp_wiki):
     job = await q.dequeue()
     assert job is not None
     assert job.progress == {"phase": "searching"}
+
+
+@pytest.mark.asyncio
+async def test_init_resets_in_progress_to_pending_on_restart(tmp_wiki):
+    """Jobs left in_progress from a crashed session must be reset to pending on init()."""
+    import aiosqlite
+    db_path = tmp_wiki / ".synthadoc" / "jobs.db"
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    async with aiosqlite.connect(db_path) as db:
+        await db.execute("""
+            CREATE TABLE jobs (
+                id TEXT PRIMARY KEY,
+                operation TEXT NOT NULL,
+                payload TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'pending',
+                retries INTEGER NOT NULL DEFAULT 0,
+                error TEXT,
+                result TEXT,
+                progress TEXT,
+                created_at TEXT NOT NULL DEFAULT (datetime('now'))
+            )
+        """)
+        await db.execute(
+            "INSERT INTO jobs (id, operation, payload, status) VALUES ('stuck1', 'ingest', '{}', 'in_progress')"
+        )
+        await db.commit()
+    q = JobQueue(db_path)
+    await q.init()
+    jobs = await q.list_jobs()
+    stuck = next(j for j in jobs if j.id == "stuck1")
+    assert stuck.status.value == "pending"
+
+
+@pytest.mark.asyncio
+async def test_requeue_resets_to_pending_without_incrementing_retries(tmp_wiki):
+    """requeue() must reset status to pending and leave retry counter unchanged."""
+    q = JobQueue(tmp_wiki / ".synthadoc" / "jobs.db")
+    await q.init()
+    job_id = await q.enqueue("ingest", {"source": "https://example.com"})
+    await q.dequeue()
+    await q.requeue(job_id, "rate_limit: too many requests")
+    jobs = await q.list_jobs()
+    job = next(j for j in jobs if j.id == job_id)
+    assert job.status.value == "pending"
+    assert job.retries == 0
+
+
+@pytest.mark.asyncio
+async def test_requeue_does_not_count_toward_max_retries(tmp_wiki):
+    """Multiple requeue() calls must not exhaust the retry budget."""
+    q = JobQueue(tmp_wiki / ".synthadoc" / "jobs.db", max_retries=2)
+    await q.init()
+    job_id = await q.enqueue("ingest", {"source": "https://example.com"})
+    for _ in range(5):
+        await q.dequeue()
+        await q.requeue(job_id, "rate_limit")
+    jobs = await q.list_jobs()
+    job = next(j for j in jobs if j.id == job_id)
+    assert job.status.value == "pending"
+    assert job.retries == 0
