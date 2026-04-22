@@ -852,13 +852,14 @@ Synthadoc defaults to **Gemini Flash** — free, no credit card, 1 million token
 Switch by editing `<wiki-root>/.synthadoc/config.toml` and restarting the server.
 
 
-| Provider    | Env var             | Free tier                                    |
-| ----------- | ------------------- | -------------------------------------------- |
-| `gemini`    | `GEMINI_API_KEY`    | **Yes — default** · 15 RPM / 1M tokens/day |
-| `groq`      | `GROQ_API_KEY`      | Yes — fast Llama, 100K tokens/day           |
-| `ollama`    | _(none)_            | Yes — fully local, no rate limits           |
-| `anthropic` | `ANTHROPIC_API_KEY` | No — highest quality, pay-per-token         |
-| `openai`    | `OPENAI_API_KEY`    | No — pay-per-token                          |
+| Provider    | Env var             | Free tier                                    | Vision |
+| ----------- | ------------------- | -------------------------------------------- | ------ |
+| `gemini`    | `GEMINI_API_KEY`    | **Yes — default** · 15 RPM / 1M tokens/day | Yes    |
+| `groq`      | `GROQ_API_KEY`      | Yes — fast Llama, 100K tokens/day           | No     |
+| `ollama`    | _(none)_            | Yes — fully local, no rate limits           | Model-dependent |
+| `minimax`   | `MINIMAX_API_KEY`   | No — cheapest paid text rates               | No     |
+| `anthropic` | `ANTHROPIC_API_KEY` | No — highest quality, pay-per-token         | Yes    |
+| `openai`    | `OPENAI_API_KEY`    | No — pay-per-token                          | Yes    |
 
 **Change the provider** — edit `.synthadoc/config.toml`:
 
@@ -869,19 +870,24 @@ default = { provider = "anthropic", model = "claude-sonnet-4-6" }
 
 # Gemini Flash (default)
 [agents]
-default = { provider = "gemini", model = "gemini-2.0-flash" }
+default = { provider = "gemini", model = "gemini-2.5-flash" }
 
 # Groq (fast free tier)
 [agents]
 default = { provider = "groq", model = "llama-3.3-70b-versatile" }
+
+# MiniMax (cheapest paid text — no vision/image support)
+[agents]
+default = { provider = "minimax", model = "MiniMax-M2.5" }
 ```
 
 Restart `synthadoc serve`. The startup banner confirms `LLM: <provider>/<model>`.
 
 > **Rate limit tips:**
 >
-> - **Gemini** free tier: 15 RPM. If you see `429 RateLimitError` during a long ingest, wait 60 s and retry, or switch to Groq.
+> - **Gemini** free tier: 15 RPM. If you see `429 RateLimitError` during a long ingest, wait 60 s and retry, or switch to Groq or MiniMax.
 > - **Groq** free tier: 100K tokens/day — adequate for short demo sessions; heavy web search ingest can exhaust it.
+> - **MiniMax:** no free tier, but M2.5 input is ~$0.15/M tokens — roughly half the cost of Gemini 2.5 Flash. Text-only; image ingestion will fall back to text extraction.
 > - **Ollama:** fully local, no rate limits. Install from [ollama.com](https://ollama.com); no API key needed.
 
 ---
@@ -933,7 +939,7 @@ Neither file is required. If both are absent, the built-in defaults take effect.
 
 ```toml
 [agents]
-default = { provider = "gemini", model = "gemini-2.0-flash" }  # free tier
+default = { provider = "gemini", model = "gemini-2.5-flash" }  # free tier
 lint    = { provider = "groq",   model = "llama-3.3-70b-versatile" }  # cheaper for lint
 
 [wikis]
