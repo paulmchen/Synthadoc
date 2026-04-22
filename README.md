@@ -118,28 +118,28 @@ As the wiki accumulates pages the `index.md` table of contents, domain scope (`p
 ### Competitive advantages
 
 
-| Capability                   | Synthadoc                                  | Typical RAG | NotebookLM | Notion AI |
-| ---------------------------- | ------------------------------------------ | ----------- | ---------- | --------- |
-| Ingest-time synthesis        | **Yes**                                    | No          | Partial    | No        |
-| Contradiction detection      | **Yes**                                    | No          | No         | No        |
-| Orphan page detection        | **Yes**                                    | No          | No         | No        |
-| Persistent wikilink graph    | **Yes**                                    | No          | No         | No        |
-| Local-first (no cloud data)  | **Yes**                                    | Varies      | No         | No        |
-| Custom skill plugins         | **Yes**                                    | Limited     | No         | No        |
-| Obsidian integration         | **Yes**                                    | No          | No         | No        |
-| Cost guard + audit trail     | **Yes**                                    | No          | No         | No        |
-| Hook / CI integration        | **Yes** (2 events)                         | No          | No         | No        |
-| Offline browsable artifact   | **Yes**                                    | No          | No         | No        |
-| Multi-wiki isolation         | **Yes**                                    | No          | No         | No        |
-| Web search → wiki pages     | **Yes**                                    | No          | No         | No        |
-| Multiple LLM support         | **Yes** (MinMax, Gemini, Groq, Anthropic) | No          | No         | No        |
-| Auto wiki overview page      | **Yes**                                    | No          | No         | No        |
-| Resumable job queue + retry  | **Yes**                                    | No          | No         | No        |
-| Query decomposition          | **Yes** (parallel sub-queries)             | No          | No         | No        |
-| Knowledge gap detection      | **Yes**                                    | No          | No         | No        |
-| Web search decomposition     | **Yes** (parallel Tavily)                  | No          | No         | No        |
-| Semantic re-ranking (vector) | **Yes** (optional fastembed)               | Varies      | No         | No        |
-| Scaffold automation          | **Yes**                                    | No          | No         | No        |
+| Capability                   | Synthadoc                                   | Typical RAG | NotebookLM | Notion AI |
+| ---------------------------- | ------------------------------------------- | ----------- | ---------- | --------- |
+| Ingest-time synthesis        | **Yes**                                     | No          | Partial    | No        |
+| Contradiction detection      | **Yes**                                     | No          | No         | No        |
+| Orphan page detection        | **Yes**                                     | No          | No         | No        |
+| Persistent wikilink graph    | **Yes**                                     | No          | No         | No        |
+| Local-first (no cloud data)  | **Yes**                                     | Varies      | No         | No        |
+| Custom skill plugins         | **Yes**                                     | Limited     | No         | No        |
+| Obsidian integration         | **Yes**                                     | No          | No         | No        |
+| Cost guard + audit trail     | **Yes**                                     | No          | No         | No        |
+| Hook / CI integration        | **Yes** (2 events)                          | No          | No         | No        |
+| Offline browsable artifact   | **Yes**                                     | No          | No         | No        |
+| Multi-wiki isolation         | **Yes**                                     | No          | No         | No        |
+| Web search → wiki pages     | **Yes**                                     | No          | No         | No        |
+| Multiple LLMs support       | **Yes** (MiniMax, Gemini, Groq, Anthropic) | No          | No         | No        |
+| Auto wiki overview page      | **Yes**                                     | No          | No         | No        |
+| Resumable job queue + retry  | **Yes**                                     | No          | No         | No        |
+| Query decomposition          | **Yes** (parallel sub-queries)              | No          | No         | No        |
+| Knowledge gap detection      | **Yes**                                     | No          | No         | No        |
+| Web search decomposition     | **Yes** (parallel Tavily)                   | No          | No         | No        |
+| Semantic re-ranking (vector) | **Yes** (optional fastembed)                | Varies      | No         | No        |
+| Scaffold automation          | **Yes**                                     | No          | No         | No        |
 
 ### Key differentiators vs. RAG
 
@@ -183,14 +183,14 @@ See [docs/design.md — Appendix A: Release Feature Index](docs/design.md#append
 **LLM API key — at least one required:**
 
 
-| Provider         | Free tier                                     | Vision | Get key                                                       |
-| ---------------- | --------------------------------------------- | ------ | ------------------------------------------------------------- |
-| **Gemini Flash** | Yes — 15 RPM / 1M tokens/day, no credit card | Yes    | [aistudio.google.com](https://aistudio.google.com/app/apikey) |
-| Groq             | Yes — rate-limited                           | No     | [console.groq.com](https://console.groq.com/keys)             |
-| Ollama           | Yes — runs locally, no key                   | Model-dependent | [ollama.com](https://ollama.com)                     |
-| MiniMax          | No — pay-per-token (cheapest text rates)     | No     | [platform.minimax.io](https://platform.minimax.io/)           |
-| Anthropic        | No                                            | Yes    | [console.anthropic.com](https://console.anthropic.com/)       |
-| OpenAI           | No                                            | Yes    | [platform.openai.com](https://platform.openai.com/api-keys)   |
+| Provider         | Free tier                                     | Vision          | Get key                                                       |
+| ---------------- | --------------------------------------------- | --------------- | ------------------------------------------------------------- |
+| **Gemini Flash** | Yes — 15 RPM / 1M tokens/day, no credit card | Yes             | [aistudio.google.com](https://aistudio.google.com/app/apikey) |
+| Groq             | Yes — rate-limited                           | No              | [console.groq.com](https://console.groq.com/keys)             |
+| Ollama           | Yes — runs locally, no key                   | Model-dependent | [ollama.com](https://ollama.com)                              |
+| MiniMax          | No — pay-per-token (cheapest text rates)     | No              | [platform.minimax.io](https://platform.minimax.io/)           |
+| Anthropic        | No                                            | Yes             | [console.anthropic.com](https://console.anthropic.com/)       |
+| OpenAI           | No                                            | Yes             | [platform.openai.com](https://platform.openai.com/api-keys)   |
 
 **Tavily API key (optional — enables web search):**
 Get a free key at [tavily.com](https://tavily.com). Without it, web search jobs will fail but all other features work normally.
@@ -232,6 +232,8 @@ npm test         # runs Vitest unit tests
 
 ### Step 4 — Set your API keys
 
+**At least one LLM API key is required** — Synthadoc will not start without one.
+
 Synthadoc defaults to **Gemini Flash** as the LLM provider — it's free, requires no
 credit card, and offers 1 million tokens per day. Get a key at
 **aistudio.google.com/app/apikey** (click "Create API key").
@@ -243,15 +245,18 @@ Web search uses **Tavily** (`TAVILY_API_KEY`) — optional, only needed for
 # macOS / Linux — add to ~/.bashrc or ~/.zshrc to persist
 export GEMINI_API_KEY=AIza…          # default — free tier, 1M tokens/day
 export GROQ_API_KEY=gsk_…            # alternative free tier — 100K tokens/day
-export ANTHROPIC_API_KEY=sk-ant-…    # paid alternative — highest quality
+export ANTHROPIC_API_KEY=sk-ant-…    # paid — highest quality
+export MINIMAX_API_KEY=…             # paid — cheapest text rates (no image support)
 export TAVILY_API_KEY=tvly-…         # web search (optional)
 
 # Windows cmd — current session only
 set GEMINI_API_KEY=AIza…
+set MINIMAX_API_KEY=…
 set TAVILY_API_KEY=tvly-…
 
 # Windows cmd — permanent (open a new cmd window after running)
 setx GEMINI_API_KEY AIza…
+setx MINIMAX_API_KEY …
 setx TAVILY_API_KEY tvly-…
 ```
 
