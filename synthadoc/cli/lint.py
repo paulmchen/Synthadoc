@@ -13,7 +13,7 @@ from synthadoc.cli._http import post
 
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
-_SKIP_SLUGS = {"index", "log", "dashboard", "purpose"}
+_SKIP_SLUGS = {"index", "log", "dashboard", "purpose", "overview"}
 
 
 def _parse_frontmatter(text: str) -> dict:
@@ -79,12 +79,16 @@ def lint_report(
         if "status: contradicted" in raw:
             contradicted.append(p.stem)
 
-    # --- Orphans: pages with no inbound [[wikilinks]] from any other page ---
+    # --- Orphans: pages with no inbound [[wikilinks]] from any content page ---
+    # Auto-generated pages (overview, index, etc.) are excluded from contributing
+    # references — a link only from overview.md is not a meaningful inbound link.
     referenced: set[str] = set()
     page_texts: dict[str, str] = {}
     for p in pages:
         raw = p.read_text(encoding="utf-8")
         page_texts[p.stem] = raw
+        if p.stem in _SKIP_SLUGS:
+            continue
         for link in _WIKILINK_RE.findall(raw):
             slug_part = link.split("|")[0].strip()
             referenced.add(slug_part.lower().replace(" ", "-"))
