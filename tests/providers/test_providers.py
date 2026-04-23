@@ -278,6 +278,30 @@ async def test_openai_provider_empty_content_returns_empty_string():
 
 
 @pytest.mark.asyncio
+async def test_openai_provider_strips_think_tags_from_content():
+    """Reasoning models (e.g. MiniMax M2.x) prefix content with <think>...</think>.
+    The provider must strip those tags so callers receive clean text."""
+    cfg = AgentConfig(provider="minimax", model="MiniMax-M2.5",
+                      base_url="https://api.minimax.io/v1")
+    provider = OpenAIProvider(api_key="test-key", config=cfg)
+
+    mock_choice = MagicMock()
+    mock_choice.message.content = '<think>Let me break this down...</think>["What is X?", "How does X work?"]'
+    mock_choice.message.model_extra = {}
+    mock_resp = MagicMock()
+    mock_resp.choices = [mock_choice]
+    mock_resp.usage.prompt_tokens = 20
+    mock_resp.usage.completion_tokens = 15
+
+    with patch.object(provider._client.chat.completions, "create",
+                      new=AsyncMock(return_value=mock_resp)):
+        result = await provider.complete(
+            messages=[Message(role="user", content="Tell me about X")]
+        )
+    assert result.text == '["What is X?", "How does X work?"]'
+
+
+@pytest.mark.asyncio
 async def test_openai_provider_extracts_json_from_reasoning_content():
     """MiniMax-style reasoning models return content=null with JSON in reasoning_content.
     The provider must extract the last JSON array from reasoning_content as a fallback."""

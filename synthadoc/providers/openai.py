@@ -55,6 +55,8 @@ class OpenAIProvider(LLMProvider):
         )
         choice = resp.choices[0]
         text = choice.message.content or ""
+        # Strip <think>...</think> blocks that reasoning models prepend to their output
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
         if not text:
             # Reasoning models (e.g. MiniMax M2.x) return content=null and put their
             # chain-of-thought in a non-standard reasoning_content field. Try to extract
