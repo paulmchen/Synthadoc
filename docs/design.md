@@ -153,15 +153,16 @@ All agents are async Python classes. They receive a job context, write results t
 
 ### IngestAgent
 
-Two-step pipeline (replaces the original four-pass design):
+Five-pass pipeline:
 
-| Step | Model | Purpose |
+| Pass | Model | Purpose |
 |------|-------|---------|
+| 0 — Vision (optional) | Default | Extract text from image sources (`is_image=True`); requires a vision-capable provider |
 | 1 — Analysis (`_analyse()`) | Default | Extract entities, tags, and a 3-sentence summary from raw text. Result cached under key `analyse-v1` keyed by SHA-256 of the text. |
-| — Candidate search | None (BM25) | Find existing wiki pages related to extracted entities |
-| 2 — Decision | Default | LLM reads summary (not full text) + BM25 candidates + `purpose.md` scope. Outputs per-page action: `create`, `update`, `flag_contradiction`, `skip` |
-| — Write | None | Apply actions; update frontmatter; write `[[wikilinks]]`; fire hooks |
-| — Overview | Default | Regenerate `wiki/overview.md` if any pages were created or updated |
+| 2 — Candidate search | None (BM25) | Find existing wiki pages related to extracted entities |
+| 3 — Decision | Default | LLM reads summary (not full text) + BM25 candidates + `purpose.md` scope. Outputs per-page action: `create`, `update`, `flag`, `skip` |
+| 4 — Write | None | Apply actions; update frontmatter; write `[[wikilinks]]`; fire hooks |
+| 5 — Overview | Default | Regenerate `wiki/overview.md` if any pages were created or updated |
 
 **Analysis caching:** The analysis step is expensive (full text read + LLM call). Results are cached in `cache.db` by text SHA-256. Subsequent ingests of the same source (e.g. after a `--force` that hits the decision cache miss) re-use the analysis result without a new LLM call.
 
@@ -221,7 +222,13 @@ query decomposed into 2 sub-question(s): "Who invented FORTRAN?" | "What was the
 
 **Knowledge gap detection:**
 
-After the BM25 merge step, if `len(candidates) < 3` OR `max_score < gap_score_threshold` (default: `2.0`, configurable via `[query] gap_score_threshold` in `synthadoc.toml`), a knowledge gap is detected:
+After the BM25 merge step, a knowledge gap is detected when ANY of three independent signals fire (gap is skipped when `gap_score_threshold = 0`):
+
+1. `len(candidates) < 3` — wiki has almost nothing on the topic
+2. `max_score < gap_score_threshold` (default: `2.0`, configurable via `[query] gap_score_threshold` in `synthadoc.toml`) — low keyword overlap
+3. Fewer than 2 candidates contain any key noun from the question with sufficient frequency — corpus-relative BM25 scores can be inflated by shared vocabulary; this content-overlap check catches off-topic matches
+
+When a gap fires:
 
 1. `SearchDecomposeAgent.decompose(question)` is called to generate 1–4 focused keyword search strings
 2. `QueryResult.knowledge_gap = True` and `QueryResult.suggested_searches = [...]` are set
@@ -499,7 +506,7 @@ Note: BM25 IDF requires a minimum of 3 documents in the corpus for non-zero scor
 | `POST` | `/jobs/lint` | `{scope?: str}` | `{job_id: str}` |
 | `GET` | `/jobs` | `?status=<filter>` | `[Job]` |
 | `GET` | `/jobs/{id}` | — | `Job` |
-| `DELETE` | `/jobs/{id}` | — | `{deleted: bool}` |
+| `DELETE` | `/jobs/{id}` | — | `{deleted: job_id}` |
 | `GET` | `/query` | `?q=<question>` | `{answer: str, citations: [str]}` |
 | `POST` | `/query` | `{question: str, save?: bool}` | `{answer: str, citations: [str], slug?: str}` |
 | `GET` | `/status` | — | `WikiStatus` |
@@ -831,14 +838,14 @@ cron = "0 3 * * 0"   # every Sunday at 03:00
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `agents.default.provider` | str | `"gemini"` | LLM provider: `anthropic`, `openai`, `gemini`, `groq`, `minimax`, `ollama` |
-| `agents.default.model` | str | `"claude-opus-4-6"` | Model ID |
+| `agents.default.model` | str | `"gemini-2.5-flash"` | Model ID |
 | `server.port` | int | `7070` | HTTP listen port |
 | `queue.max_parallel_ingest` | int | `4` | Max concurrent ingest agents |
 | `queue.max_retries` | int | `3` | Retries before job → dead |
 | `queue.backoff_base_seconds` | int | `5` | Exponential backoff base (±20% jitter) |
 | `cache.version` | str | `"4"` | Bump to invalidate all cached LLM responses without touching source code |
-| `cost.soft_warn_usd` | float | `0.50` | Log warning, continue _(inactive in v0.1 — see note below)_ |
-| `cost.hard_gate_usd` | float | `2.00` | Require explicit confirmation _(inactive in v0.1 — see note below)_ |
+| `cost.soft_warn_usd` | float | `0.50` | Log warning, continue _(configured but not yet enforced — cost_guard is wired to the config but check() is not called in the ingest path)_ |
+| `cost.hard_gate_usd` | float | `2.00` | Require explicit confirmation _(configured but not yet enforced — see above)_ |
 | `cost.auto_resolve_confidence_threshold` | float | `0.85` | Auto-apply lint resolutions above this score |
 | `ingest.max_pages_per_ingest` | int | `15` | Max pages one ingest may update |
 | `ingest.chunk_size` | int | `1500` | Text chunk size (characters) |

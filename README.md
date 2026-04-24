@@ -586,7 +586,7 @@ synthadoc audit history -w my-wiki            # last 50 records
 synthadoc audit history -n 100 -w my-wiki     # last 100 records
 synthadoc audit history --json -w my-wiki     # raw JSON for scripting
 
-# Token usage: totals + daily breakdown (cost always $0.0000 in v0.1)
+# Token usage: totals + daily breakdown with per-model cost estimates
 synthadoc audit cost -w my-wiki               # last 30 days
 synthadoc audit cost --days 7 -w my-wiki      # last 7 days
 
@@ -696,7 +696,7 @@ synthadoc audit events -w my-wiki           # table: timestamp, job_id, event ty
 synthadoc audit events --json -w my-wiki    # raw JSON
 ```
 
-> **Note:** In v0.1, `cost_usd` for ingest was always `$0.0000`. In v0.2, query costs are tracked using an approximate rate. Per-model pricing tables are planned for a future release — token counts are always accurate.
+> **Note:** In v0.2, cost tracking is live for both ingest and query using per-model pricing tables. Token counts are always accurate; cost figures are approximate based on published API rates.
 
 ### Cache management
 
