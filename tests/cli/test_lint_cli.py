@@ -132,3 +132,33 @@ def test_lint_report_missing_wiki_dir(tmp_path, monkeypatch):
                         lambda: {"mywiki": {"path": str(tmp_path)}})
     result = runner.invoke(app, ["lint", "report", "-w", "mywiki"])
     assert result.exit_code != 0
+
+
+def test_lint_report_syncs_orphan_frontmatter(tmp_path, monkeypatch):
+    """lint report must write orphan: true on orphan pages and orphan: false on linked ones."""
+    import synthadoc.cli.install as install_mod
+
+    orphan_fm = "---\ntitle: Orphan Page\nstatus: active\norphan: false\n---\n\n# Orphan Page\n"
+    linked_fm = "---\ntitle: Linked Page\nstatus: active\norphan: true\n---\n\n# Linked Page\n"
+    hub_content = "# Hub\n\nSee [[linked-page]]."
+
+    wiki_dir, root = _make_wiki(tmp_path, {
+        "index":       "# Index\n",
+        "hub":         hub_content,
+        "orphan-page": orphan_fm,
+        "linked-page": linked_fm,
+    })
+    monkeypatch.setattr(install_mod, "_read_registry",
+                        lambda: {"mywiki": {"path": str(tmp_path)}})
+
+    result = runner.invoke(app, ["lint", "report", "-w", "mywiki"])
+    assert result.exit_code == 0, result.output
+
+    from synthadoc.cli.lint import _parse_frontmatter
+    orphan_text = (wiki_dir / "orphan-page.md").read_text(encoding="utf-8")
+    linked_text = (wiki_dir / "linked-page.md").read_text(encoding="utf-8")
+
+    assert _parse_frontmatter(orphan_text).get("orphan") is True, \
+        "orphan-page must be flagged orphan: true"
+    assert _parse_frontmatter(linked_text).get("orphan") is False, \
+        "linked-page must be cleared to orphan: false"
