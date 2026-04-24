@@ -192,7 +192,9 @@ def _slugify(title: str) -> str:
 
 ### QueryAgent
 
-**Pipeline (v0.2.0 — query decomposition):**
+#### Query Decomposition
+
+**Pipeline:**
 
 ```
 Question
@@ -220,7 +222,7 @@ query decomposed into 2 sub-question(s): "Who invented FORTRAN?" | "What was the
 
 **BM25 corpus cache:** `HybridSearch` builds the BM25 corpus once per server session and caches it in memory (`_cached_corpus`). The cache is invalidated by `invalidate_index()` after every `write_page()` call in IngestAgent, so queries always see current wiki content without redundant disk reads.
 
-**Knowledge gap detection:**
+#### Knowledge Gap Workflow
 
 After the BM25 merge step, a knowledge gap is detected when ANY of three independent signals fire (gap is skipped when `gap_score_threshold = 0`):
 
@@ -275,6 +277,50 @@ web search is simple — no decomposition (1 query)
 web search decomposed into 3 queries: "Canada hardiness zones map" | "frost dates Canadian cities" | "planting guide by province Canada"
 ```
 
+### Semantic Re-ranking
+
+> **Opt-in.** BM25 is the default and works without any additional dependencies.
+
+**Installation:**
+
+```bash
+pip install fastembed
+```
+
+**Enable in config:**
+
+```toml
+[search]
+vector = true
+vector_top_candidates = 20   # BM25 candidate pool; top_n returned after re-ranking
+```
+
+**Embedding model:** `BAAI/bge-small-en-v1.5` (~130 MB), managed by `fastembed`. Downloaded once on the first server start with `vector = true`; cached at `~/.cache/fastembed/` thereafter.
+
+**On first enable**, the server prints and logs:
+
+```
+Vector search enabled — downloading embedding model BAAI/bge-small-en-v1.5 (~130 MB)
+to ~/.cache/fastembed/. This is a one-time download.
+```
+
+**Search flow (when `vector = true`):**
+
+1. BM25 retrieves top `vector_top_candidates` (default 20) candidates
+2. The query is embedded; cosine similarity is computed against each candidate's stored vector
+3. Results are re-ranked by vector score; top `top_n` (default 8) are returned to the caller
+
+**Migration:** On first enable, a background task embeds all existing wiki pages into `embeddings.db`. BM25 continues to serve all queries during migration — no downtime. Progress is logged every 50 pages. New pages are embedded immediately on write.
+
+**Fallback:** If `embeddings.db` is empty, the model is unavailable, or `fastembed` is not installed, BM25 ranking is used automatically with no error.
+
+**Performance notes:**
+- First enable on a large wiki may take several minutes to embed all pages. Subsequent server starts are instant (model and embeddings already cached).
+- The re-ranking step is CPU-only and adds single-digit milliseconds per query after migration.
+- Set `vector = false` to revert to BM25-only at any time. Existing embeddings are not deleted.
+
+---
+
 ### LintAgent
 
 Runs against the entire wiki or a scoped subset:
@@ -289,6 +335,10 @@ Runs against the entire wiki or a scoped subset:
 **Auto-resolution:** For contradictions, LintAgent asks the LLM to propose a resolution with a confidence score. If score ≥ `auto_resolve_confidence_threshold` (default 0.85), applies automatically. Below threshold, queues for human review.
 
 **Index suggestion:** For orphan pages, LintAgent reads the page frontmatter and generates a ready-to-paste `wiki/index.md` entry: `- [[slug]] — tag1, tag2, tag3`.
+
+**Orphan frontmatter sync:** After computing orphans, both `LintAgent.lint()` (server-side, via `POST /jobs/lint`) and `synthadoc lint report` (CLI, offline) write `orphan: true` or `orphan: false` to each eligible page's YAML frontmatter. This keeps the Obsidian Dataview query (`WHERE orphan = true`) in sync with the computed orphan state without requiring the server to be running after `lint report`.
+
+**Auto-generated page exclusions:** The pages `index`, `dashboard`, `overview`, `log`, and `purpose` are excluded from both orphan detection and contradiction checking. Links from these pages do not count as real inbound references — a page linked only from `overview.md` is still reported as an orphan. These pages are also never flagged as contradicted by the ingest pipeline.
 
 ### SkillAgent
 

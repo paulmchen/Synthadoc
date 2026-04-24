@@ -400,7 +400,18 @@ See [docs/design.md — Query decomposition and web search decomposition](docs/d
 
 ### Semantic re-ranking (vector search)
 
-BM25 keyword search is the default. Optional vector re-ranking (`BAAI/bge-small-en-v1.5` cosine similarity) improves recall on conceptually related queries — enable it by installing `fastembed` and setting `[search] vector = true` in config. The ~130 MB model is downloaded once; BM25 stays active as fallback.
+BM25 keyword search is the default. Optional vector re-ranking (`BAAI/bge-small-en-v1.5` cosine similarity) improves recall on conceptually related queries. The ~130 MB model is downloaded once on first enable; BM25 stays active as fallback.
+
+```bash
+pip install fastembed
+```
+
+Then enable in your wiki's `.synthadoc/config.toml`:
+
+```toml
+[search]
+vector = true
+```
 
 See [docs/design.md — Semantic re-ranking](docs/design.md#semantic-re-ranking) for configuration options and performance notes.
 
