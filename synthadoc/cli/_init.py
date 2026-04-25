@@ -112,7 +112,7 @@ SORT created DESC
 
 *These pages exist but nothing links to them.
 Orphan status is set by `synthadoc lint run` — run it first to populate this list.
-Add `[[page-name]]` to a related page or to [[index]].*
+Add `[[page-name]]` to a related content page to integrate it into the graph.*
 
 ---
 
@@ -134,6 +134,10 @@ def init_wiki(root: Path, domain: str = "General", port: int = 7070) -> None:
     (root / "raw_sources").mkdir(exist_ok=True)
     (root / "hooks").mkdir(exist_ok=True)
     (root / ".synthadoc" / "logs").mkdir(parents=True, exist_ok=True)
+    (root / ".obsidian").mkdir(exist_ok=True)
+    (root / ".obsidian" / "app.json").write_text(
+        '{\n  "userIgnoreFilters": [\n    "raw_sources"\n  ]\n}\n',
+        encoding="utf-8", newline="\n")
     (root / "AGENTS.md").write_text(
         _AGENTS_MD.format(domain=domain), encoding="utf-8", newline="\n")
     (root / "wiki" / "index.md").write_text(
