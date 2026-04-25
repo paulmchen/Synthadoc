@@ -221,11 +221,12 @@ def test_is_daily_quota_error_returns_false_for_per_minute():
 
 @pytest.mark.asyncio
 async def test_openai_provider_daily_quota_raises_immediately_without_retry():
-    """A Gemini daily-quota 429 must raise immediately — no sleep, no retry,
-    to avoid wasting 65 s and burning one more scarce daily request."""
+    """A Gemini daily-quota 429 must raise DailyQuotaExhaustedException immediately —
+    no sleep, no retry, to avoid wasting 65 s and burning one more scarce daily request."""
     import openai
     from synthadoc.providers.openai import OpenAIProvider
-    cfg = AgentConfig(provider="gemini", model="gemini-2.5-flash",
+    from synthadoc.errors import DailyQuotaExhaustedException
+    cfg = AgentConfig(provider="gemini", model="gemini-2.5-flash-lite",
                       base_url="https://generativelanguage.googleapis.com/v1beta/openai/")
     provider = OpenAIProvider(api_key="test-key", config=cfg)
 
@@ -249,7 +250,7 @@ async def test_openai_provider_daily_quota_raises_immediately_without_retry():
 
     with patch.object(provider._client.chat.completions, "create", side_effect=flaky):
         with patch("synthadoc.providers.openai._sleep", new=sleep_mock):
-            with pytest.raises(openai.RateLimitError):
+            with pytest.raises(DailyQuotaExhaustedException):
                 await provider.complete(messages=[Message(role="user", content="hi")])
 
     assert call_count == 1, "daily quota must not be retried"

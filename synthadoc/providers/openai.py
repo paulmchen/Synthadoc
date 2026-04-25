@@ -113,7 +113,8 @@ class OpenAIProvider(LLMProvider):
                         "providers.",
                         self._config.provider,
                     )
-                    raise  # fail fast — daily quota won't recover in 65 s
+                    from synthadoc.errors import DailyQuotaExhaustedException
+                    raise DailyQuotaExhaustedException(self._config.provider) from exc
                 last_exc = exc
         raise last_exc  # type: ignore[misc]
 
