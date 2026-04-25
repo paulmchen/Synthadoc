@@ -25,19 +25,24 @@ class UrlSkill(BaseSkill):
                      extensions=["https://", "http://"])
 
     async def extract(self, source: str) -> ExtractedContent:
-        async with httpx.AsyncClient(follow_redirects=True, timeout=30, headers=_HEADERS) as client:
-            resp = await client.get(source)
-            if resp.status_code in _BLOCKED_STATUSES:
-                domain = urlparse(source).hostname or source
-                raise DomainBlockedException(
-                    domain=domain, url=source, status_code=resp.status_code
-                )
-            resp.raise_for_status()
-            content_type = resp.headers.get("content-type", "")
-            is_pdf = "application/pdf" in content_type or source.lower().endswith(".pdf")
-            if is_pdf:
-                return self._extract_pdf_response(resp.content, source)
-            html = resp.text
+        try:
+            async with httpx.AsyncClient(follow_redirects=True, timeout=30, headers=_HEADERS) as client:
+                resp = await client.get(source)
+        except httpx.TransportError as exc:
+            # ReadError, ConnectError, TimeoutException, etc. — treat as transient;
+            # raise so the job fails cleanly and enters the normal retry queue.
+            raise RuntimeError(f"Network error fetching {source}: {exc}") from exc
+        if resp.status_code in _BLOCKED_STATUSES:
+            domain = urlparse(source).hostname or source
+            raise DomainBlockedException(
+                domain=domain, url=source, status_code=resp.status_code
+            )
+        resp.raise_for_status()
+        content_type = resp.headers.get("content-type", "")
+        is_pdf = "application/pdf" in content_type or source.lower().endswith(".pdf")
+        if is_pdf:
+            return self._extract_pdf_response(resp.content, source)
+        html = resp.text
 
         soup = BeautifulSoup(html, "html.parser")
         for tag in soup(["script", "style", "nav", "footer"]):
