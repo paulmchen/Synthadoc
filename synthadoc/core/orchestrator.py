@@ -136,6 +136,7 @@ class Orchestrator:
                 log_writer=self._log, audit_db=self._audit,
                 cache=self._cache, max_pages=self._cfg.ingest.max_pages_per_ingest,
                 cache_version=self._cfg.cache.version,
+                fetch_timeout=self._cfg.ingest.fetch_timeout_seconds,
             )
             result = await agent.ingest(source, force=force, bust_cache=force)
             _agent_cfg = self._cfg.agents.resolve("ingest")

@@ -35,10 +35,14 @@ class UrlSkill(BaseSkill):
     meta = SkillMeta(name="url", description="Fetch and extract text from web URLs",
                      extensions=["https://", "http://"])
 
+    def __init__(self, fetch_timeout: int = 30) -> None:
+        super().__init__()
+        self._fetch_timeout = fetch_timeout
+
     async def extract(self, source: str) -> ExtractedContent:
         try:
             async with httpx.AsyncClient(
-                follow_redirects=True, timeout=30, headers=_HEADERS, verify=_SSL_CONTEXT
+                follow_redirects=True, timeout=self._fetch_timeout, headers=_HEADERS, verify=_SSL_CONTEXT
             ) as client:
                 resp = await client.get(source)
         except httpx.ConnectError as exc:
