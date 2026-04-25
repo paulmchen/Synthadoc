@@ -20,15 +20,14 @@ class LintReport:
 
 _WIKILINK_RE = re.compile(r"\[\[([^\]]+)\]\]")
 
-# Auto-generated pages whose outbound links must NOT count as real references.
-# A page linked only from overview/dashboard/log is still an orphan.
+# Auto-generated / directory pages whose outbound links must NOT count as real
+# references.  A page linked only from index/overview/dashboard is still an
+# orphan in the content graph — it is not integrated into the knowledge network.
 LINT_SKIP_SOURCE_SLUGS: frozenset[str] = frozenset(
-    {"overview", "log", "dashboard"}
+    {"index", "overview", "log", "dashboard"}
 )
 
 # Pages never reported as orphans (root / auto-generated pages).
-# index.md is manually curated — its outbound links DO count — but it has
-# no meaningful inbound links and must never appear in orphan reports itself.
 LINT_SKIP_SLUGS: frozenset[str] = frozenset(
     {"index", "log", "dashboard", "purpose", "overview"}
 )
@@ -39,11 +38,11 @@ def find_orphan_slugs(
     skip: frozenset[str] = LINT_SKIP_SLUGS,
     skip_source: frozenset[str] = LINT_SKIP_SOURCE_SLUGS,
 ) -> list[str]:
-    """Return slugs with no inbound [[wikilinks]] from other non-skip pages.
+    """Return slugs with no inbound [[wikilinks]] from other content pages.
 
     page_texts maps slug → page body text (frontmatter must be stripped by caller).
-    Links from skip_source pages (overview, dashboard, log) and self-links are not
-    counted. Links FROM index.md do count — adding a page to index rescues it.
+    Links from skip_source pages (index, overview, dashboard, log) and self-links
+    are not counted — only connections between content pages rescue from orphan.
     """
     referenced: set[str] = set()
     for slug, text in page_texts.items():

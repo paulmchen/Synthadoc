@@ -137,7 +137,7 @@ def lint_report(
             fm = _parse_frontmatter(page_texts.get(slug, ""))
             suggestion = _index_suggestion(slug, fm)
             typer.echo(f"  {slug}")
-            typer.echo(f"    -> Add [[{slug}]] to a related page, or add to wiki/index.md:")
+            typer.echo(f"    -> Add [[{slug}]] to a related content page, e.g.:")
             typer.echo(f"         {suggestion}")
 
     # Sync orphan: true/false frontmatter so the Obsidian dashboard Dataview

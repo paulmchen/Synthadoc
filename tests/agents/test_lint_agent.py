@@ -92,8 +92,9 @@ def test_find_orphan_slugs_skip_slugs_never_reported():
         assert slug not in orphans
 
 
-def test_find_orphan_slugs_index_links_count():
-    """Links from index.md DO count — adding a page to index rescues it from orphan.
+def test_find_orphan_slugs_index_links_do_not_rescue():
+    """Links from index.md must NOT rescue pages from orphan status.
+    index is a directory page; only content-page links count.
     index itself must never appear in the orphan report."""
     page_texts = {
         "index":   "## Recently Added\n- [[page-a]]\n",
@@ -101,9 +102,9 @@ def test_find_orphan_slugs_index_links_count():
         "page-b":  "No outbound links.",
     }
     orphans = find_orphan_slugs(page_texts)
-    assert "page-a" not in orphans   # index links to page-a → rescued
-    assert "page-b" in orphans        # nothing links to page-b → orphan
-    assert "index" not in orphans     # index itself never reported as orphan
+    assert "page-a" in orphans       # index link doesn't count → still orphan
+    assert "page-b" in orphans       # nothing links to page-b → orphan
+    assert "index" not in orphans    # index itself never reported as orphan
 
 
 def test_find_orphan_slugs_self_link_does_not_prevent_orphan():
