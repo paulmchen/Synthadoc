@@ -12,7 +12,7 @@ from synthadoc.cli.main import app
 from synthadoc.cli._http import post
 
 _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---", re.DOTALL)
-from synthadoc.agents.lint_agent import find_orphan_slugs, LINT_SKIP_SLUGS
+from synthadoc.agents.lint_agent import find_orphan_slugs, LINT_SKIP_SLUGS, LINT_SKIP_SOURCE_SLUGS
 
 
 def _parse_frontmatter(text: str) -> dict:
