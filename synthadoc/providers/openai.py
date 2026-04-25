@@ -28,7 +28,7 @@ _NO_VISION_HOSTS = ("groq.com",)
 # raises immediately without any sleep — sleeping 65 s then retrying would waste
 # time and burn one more precious daily request on a call that will always fail.
 #
-# Free-tier Gemini 2.5 Flash: 5 RPM / 20 RPD.  Groq has similar per-minute caps.
+# Default demo model is Gemini 2.5 Flash-Lite: 30 RPM / 1,000 RPD.  Groq has similar caps.
 _RATE_LIMIT_RETRY_DELAYS_S: tuple[int, ...] = (65,)
 
 # Module-level alias so tests can patch precisely:
