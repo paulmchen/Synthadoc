@@ -206,12 +206,14 @@ class Orchestrator:
             elif isinstance(e, DomainBlockedException):
                 await self._auto_block_domain(e)
                 await self._queue.skip(job_id, str(e))
-            elif isinstance(e, (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.PoolTimeout)):
-                # Transient network timeout — retry with backoff, no traceback.
+            elif isinstance(e, (httpx.ReadTimeout, httpx.ConnectTimeout, httpx.PoolTimeout,
+                                   httpx.ConnectError, httpx.ReadError)):
+                # Transient network error (timeout, connection refused, dropped) — retry with backoff.
                 logging.getLogger(__name__).warning(
-                    "URL fetch timed out for job %s (%s) — will retry", job_id, source
+                    "URL fetch failed for job %s (%s: %s) — will retry", job_id, source,
+                    type(e).__name__
                 )
-                await self._queue.fail(job_id, f"ReadTimeout: {source}")
+                await self._queue.fail(job_id, f"{type(e).__name__}: {source}")
             elif isinstance(e, httpx.HTTPStatusError):
                 status = e.response.status_code
                 if 400 <= status < 500:
