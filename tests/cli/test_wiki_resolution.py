@@ -1,0 +1,95 @@
+# SPDX-License-Identifier: AGPL-3.0-or-later
+# Copyright (C) 2026 William Johnason / axoviq.com
+import os
+import pytest
+from pathlib import Path
+from unittest.mock import patch
+import click
+
+
+def _imp():
+    from synthadoc.cli._wiki import resolve_wiki, ENV_VAR, DEFAULT_WIKI_FILE, \
+        _read_default_wiki, _write_default_wiki
+    return resolve_wiki, ENV_VAR, DEFAULT_WIKI_FILE, _read_default_wiki, _write_default_wiki
+
+
+# --- resolution priority ---
+
+def test_explicit_wins_over_env(monkeypatch):
+    resolve_wiki, ENV_VAR, _, _r, _ = _imp()
+    monkeypatch.setenv(ENV_VAR, "env-wiki")
+    with patch("synthadoc.cli._wiki._read_default_wiki", return_value=None):
+        result = resolve_wiki("explicit-wiki")
+    assert result == "explicit-wiki"
+
+
+def test_explicit_wins_over_saved(monkeypatch):
+    resolve_wiki, ENV_VAR, _, _r, _ = _imp()
+    monkeypatch.delenv(ENV_VAR, raising=False)
+    with patch("synthadoc.cli._wiki._read_default_wiki", return_value="saved-wiki"):
+        result = resolve_wiki("explicit-wiki")
+    assert result == "explicit-wiki"
+
+
+def test_env_var_used_when_no_explicit(monkeypatch):
+    resolve_wiki, ENV_VAR, _, _r, _ = _imp()
+    monkeypatch.setenv(ENV_VAR, "env-wiki")
+    with patch("synthadoc.cli._wiki._read_default_wiki", return_value=None):
+        result = resolve_wiki(None)
+    assert result == "env-wiki"
+
+
+def test_saved_default_used_when_no_explicit_no_env(monkeypatch):
+    resolve_wiki, ENV_VAR, _, _r, _ = _imp()
+    monkeypatch.delenv(ENV_VAR, raising=False)
+    with patch("synthadoc.cli._wiki._read_default_wiki", return_value="saved-wiki"):
+        result = resolve_wiki(None)
+    assert result == "saved-wiki"
+
+
+def test_cwd_fallback_when_config_present(monkeypatch, tmp_path):
+    resolve_wiki, ENV_VAR, _, _r, _ = _imp()
+    monkeypatch.delenv(ENV_VAR, raising=False)
+    (tmp_path / ".synthadoc").mkdir()
+    (tmp_path / ".synthadoc" / "config.toml").write_text("")
+    monkeypatch.chdir(tmp_path)
+    with patch("synthadoc.cli._wiki._read_default_wiki", return_value=None):
+        result = resolve_wiki(None)
+    assert result == "."
+
+
+def test_error_when_nothing_resolves(monkeypatch, tmp_path):
+    resolve_wiki, ENV_VAR, _, _r, _ = _imp()
+    monkeypatch.delenv(ENV_VAR, raising=False)
+    monkeypatch.chdir(tmp_path)   # no .synthadoc/config.toml here
+    with patch("synthadoc.cli._wiki._read_default_wiki", return_value=None):
+        with pytest.raises(click.exceptions.Exit) as exc:
+            resolve_wiki(None)
+    assert exc.value.exit_code == 1
+
+
+def test_whitespace_env_var_is_ignored(monkeypatch):
+    resolve_wiki, ENV_VAR, _, _r, _ = _imp()
+    monkeypatch.setenv(ENV_VAR, "   ")
+    with patch("synthadoc.cli._wiki._read_default_wiki", return_value="saved"):
+        result = resolve_wiki(None)
+    assert result == "saved"
+
+
+# --- _read_default_wiki / _write_default_wiki ---
+
+def test_read_write_roundtrip(tmp_path):
+    _, _, _, _read, _write = _imp()
+    with patch("synthadoc.cli._wiki.DEFAULT_WIKI_FILE", tmp_path / "default_wiki"):
+        assert _read() is None
+        _write("my-wiki")
+        assert _read() == "my-wiki"
+        _write(None)
+        assert _read() is None
+
+
+def test_write_strips_whitespace(tmp_path):
+    _, _, _, _read, _write = _imp()
+    with patch("synthadoc.cli._wiki.DEFAULT_WIKI_FILE", tmp_path / "default_wiki"):
+        _write("  my-wiki  ")
+        assert _read() == "my-wiki"
