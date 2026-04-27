@@ -303,13 +303,13 @@ The server binds to `http://127.0.0.1:7070` by default (port is set in `<wiki-ro
 
 ### Skip typing -w on every command
 
-After installing a wiki, set it as your active context once:
+Set the demo wiki as your active context once — you won't need `-w` for the rest of the walkthrough:
 
 ```bash
-synthadoc use my-wiki
+synthadoc use history-of-computing
 ```
 
-All subsequent commands in any terminal run against `my-wiki` by default.
+All subsequent commands in any terminal run against `history-of-computing` by default.
 Pass `-w <other>` to override for a single command.
 
 **Multiple wikis:** switch instantly with `synthadoc use <other-wiki>`.

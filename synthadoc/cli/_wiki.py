@@ -66,7 +66,7 @@ def resolve_wiki(explicit: Optional[str]) -> str:
 
     if saved_wiki:
         typer.echo(
-            f"[wiki: {saved_wiki}]  source: saved default — run 'synthadoc use <name>' to change",
+            f"[wiki: {saved_wiki}]  source: saved default — run 'synthadoc use' to switch wikis",
             err=True,
         )
         return saved_wiki
