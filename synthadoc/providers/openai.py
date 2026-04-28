@@ -132,19 +132,26 @@ class OpenAIProvider(LLMProvider):
         text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
         if not text:
             # Reasoning models (e.g. MiniMax M2.x) return content=null and put their
-            # chain-of-thought in a non-standard reasoning_content field. Try to extract
-            # the last JSON-like block from it so structured callers still get a result.
+            # answer in a non-standard reasoning_content field.  For structured callers
+            # (e.g. decompose) we extract the last JSON array; for prose callers
+            # (e.g. query synthesis) we fall back to the full cleaned text.
             extra = getattr(choice.message, "model_extra", None) or {}
             reasoning = (extra.get("reasoning_content") or "").strip()
             if reasoning:
-                last_close = reasoning.rfind("]")
+                clean = re.sub(r"<think>.*?</think>", "", reasoning, flags=re.DOTALL).strip()
+                last_close = clean.rfind("]")
                 if last_close >= 0:
-                    last_open = reasoning.rfind("[", 0, last_close)
+                    last_open = clean.rfind("[", 0, last_close)
                     if last_open >= 0:
-                        text = reasoning[last_open: last_close + 1]
+                        text = clean[last_open: last_close + 1]
                         logger.debug(
                             "OpenAI provider: content=null — extracted JSON from reasoning_content"
                         )
+                if not text:
+                    text = clean
+                    logger.debug(
+                        "OpenAI provider: content=null — using full reasoning_content as prose answer"
+                    )
         return CompletionResponse(text=text,
                                   input_tokens=resp.usage.prompt_tokens,
                                   output_tokens=resp.usage.completion_tokens)
