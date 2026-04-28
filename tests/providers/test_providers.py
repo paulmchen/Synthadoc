@@ -817,6 +817,22 @@ def test_classify_llm_error_names_gemini_key_in_401():
     assert "GEMINI_API_KEY" in result.detail
 
 
+def test_classify_llm_error_returns_402_for_insufficient_balance():
+    """A 402 Insufficient Balance must return a 402 HTTPException, not 502."""
+    import openai
+    from synthadoc.integration.http_server import _classify_llm_error
+    exc = openai.APIStatusError(
+        message="Insufficient Balance",
+        response=MagicMock(status_code=402),
+        body={"error": {"message": "Insufficient Balance", "type": "unknown_error"}},
+    )
+    result = _classify_llm_error(exc)
+    assert result is not None
+    assert result.status_code == 402
+    assert "Insufficient Balance" in result.detail
+    assert "billing" in result.detail.lower()
+
+
 def test_classify_llm_error_returns_none_for_unrecognised():
     """Unrecognised exception (no status_code, not DailyQuota) returns None → caller emits 502."""
     from synthadoc.integration.http_server import _classify_llm_error

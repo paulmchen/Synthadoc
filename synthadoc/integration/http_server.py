@@ -55,6 +55,16 @@ def _classify_llm_error(exc: Exception) -> "HTTPException | None":
             status_code=401,
             detail=f"LLM provider rejected the API key (401). Check that {var} is set correctly and restart the server.",
         )
+    if code == 402:
+        body = getattr(exc, "body", None) or {}
+        err_msg = ""
+        if isinstance(body, dict):
+            err_msg = body.get("error", {}).get("message", "")
+        detail = err_msg or "Insufficient balance"
+        return HTTPException(
+            status_code=402,
+            detail=f"LLM provider payment required (402): {detail}. Top up your account balance at your provider's billing page and retry.",
+        )
     if code == 429:
         msg = str(exc)
         _SWITCH_429 = "Switch to another provider by editing [agents] in .synthadoc/config.toml and restarting the server (options: anthropic, openai, gemini, groq, minimax, deepseek, ollama)."
