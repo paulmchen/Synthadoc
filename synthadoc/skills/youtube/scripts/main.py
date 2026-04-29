@@ -11,6 +11,12 @@ from synthadoc.skills.base import BaseSkill, ExtractedContent, SkillMeta
 logger = logging.getLogger(__name__)
 
 
+def _format_timestamp(seconds: float) -> str:
+    """Convert seconds to MM:SS for embedding in transcript text."""
+    mins, secs = divmod(int(seconds), 60)
+    return f"{mins}:{secs:02d}"
+
+
 def _extract_video_id(url: str) -> str | None:
     """Return the YouTube video ID from any recognised URL form, or None."""
     parsed = urlparse(url)
@@ -74,7 +80,9 @@ class YoutubeSkill(BaseSkill):
                 text="", source_path=source, metadata={"url": source}
             )
 
-        text = " ".join(snippet.text for snippet in fetched)
+        text = " ".join(
+            f"[{_format_timestamp(snippet.start)}] {snippet.text}" for snippet in fetched
+        )
         return ExtractedContent(
             text=text,
             source_path=source,

@@ -26,12 +26,12 @@ def _fake_transcript():
 
 @pytest.mark.asyncio
 async def test_extract_returns_transcript_text():
-    """Successful extraction joins all caption entries into a single text string."""
+    """Transcript text is joined with [MM:SS] timestamp prefixes on each snippet."""
     skill = _load_skill()
     with patch("synthadoc.skills.youtube.scripts.main.asyncio.to_thread",
                new=AsyncMock(return_value=_fake_transcript())):
         result = await skill.extract("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
-    assert result.text == "Hello world. This is a test."
+    assert result.text == "[0:00] Hello world. [0:02] This is a test."
     assert result.source_path == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
 
 
@@ -112,3 +112,31 @@ async def test_metadata_contains_video_id_and_url():
         result = await skill.extract("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
     assert result.metadata["video_id"] == "dQw4w9WgXcQ"
     assert result.metadata["url"] == "https://www.youtube.com/watch?v=dQw4w9WgXcQ"
+
+
+def test_format_timestamp():
+    """_format_timestamp converts float seconds to MM:SS string."""
+    from synthadoc.skills.youtube.scripts.main import _format_timestamp
+    assert _format_timestamp(0.0) == "0:00"
+    assert _format_timestamp(2.5) == "0:02"
+    assert _format_timestamp(60.0) == "1:00"
+    assert _format_timestamp(90.0) == "1:30"
+    assert _format_timestamp(3661.0) == "61:01"
+
+
+@pytest.mark.asyncio
+async def test_transcript_text_contains_timestamps():
+    """Each snippet must be prefixed with its [MM:SS] timestamp in the output text."""
+    from types import SimpleNamespace
+    skill = _load_skill()
+    snippets = [
+        SimpleNamespace(text="Moore's Law.", start=0.0, duration=3.0),
+        SimpleNamespace(text="Transistor scaling.", start=90.0, duration=4.0),
+        SimpleNamespace(text="End of scaling.", start=3661.0, duration=5.0),
+    ]
+    with patch("synthadoc.skills.youtube.scripts.main.asyncio.to_thread",
+               new=AsyncMock(return_value=snippets)):
+        result = await skill.extract("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
+    assert "[0:00] Moore's Law." in result.text
+    assert "[1:30] Transistor scaling." in result.text
+    assert "[61:01] End of scaling." in result.text
