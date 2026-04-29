@@ -75,7 +75,7 @@ _DECISION_PROMPT = (
     "-> action='update', target=slug of page to extend,\n"
     "   update_content=new ## section(s) to append (use [[slug]] links to related pages)\n\n"
     "RULE 3 — CREATE: ONLY if the source covers a subject not in any existing page.\n"
-    "-> action='create', new_slug=snake_case_slug,\n"
+    "-> action='create', new_slug=meaningful_topic_slug (e.g. 'history-of-computing', NOT 'watch' or URL path segments),\n"
     "   page_content=full synthesized Markdown body (# Title + paragraphs with [[slug]] links)\n\n"
     'Return: {{"reasoning":"...","action":"...","target":"","new_slug":"","update_content":"","page_content":""}}\n\n'
     "Existing wiki pages (top matches):\n{pages}\n\n"
@@ -98,7 +98,11 @@ _VISION_PROMPT = (
 )
 
 
-_SLUG_BLACKLIST = frozenset({"wikilinks", "wikilink", "wiki", "obsidian", "dataview"})
+_SLUG_BLACKLIST = frozenset({
+    "wikilinks", "wikilink", "wiki", "obsidian", "dataview",
+    # URL path segments that are never meaningful topic names
+    "watch", "embed", "video", "index", "page", "post", "article", "content",
+})
 
 
 def _coerce_str_list(lst: object) -> list[str]:
