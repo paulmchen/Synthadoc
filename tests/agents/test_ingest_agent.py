@@ -940,3 +940,42 @@ async def test_youtube_no_summary_falls_back_to_existing_flow(tmp_wiki, mock_pro
         result = await agent.ingest("https://www.youtube.com/watch?v=dQw4w9WgXcQ")
 
     assert result.pages_created or result.pages_updated
+
+
+@pytest.mark.asyncio
+async def test_youtube_rerun_same_url_is_skipped(tmp_wiki, mock_provider):
+    """Re-ingesting the same YouTube URL must be skipped (deduped by URL hash)."""
+    from unittest.mock import patch
+    from synthadoc.skills.base import ExtractedContent
+    from synthadoc.storage.wiki import WikiStorage
+    from synthadoc.storage.search import HybridSearch
+    from synthadoc.storage.log import LogWriter, AuditDB
+    from synthadoc.core.cache import CacheManager
+
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    log = LogWriter(tmp_wiki / "wiki" / "log.md")
+    audit = AuditDB(tmp_wiki / ".synthadoc" / "audit.db")
+    await audit.init()
+    cache = CacheManager(tmp_wiki / ".synthadoc" / "cache.db")
+    await cache.init()
+
+    url = "https://www.youtube.com/watch?v=O5nskjZ_GoI"
+    mock_extracted = ExtractedContent(
+        text="[0:00] Hello world.",
+        source_path=url,
+        metadata={"url": url, "video_id": "O5nskjZ_GoI"},
+    )
+
+    agent = IngestAgent(provider=mock_provider, store=store, search=search,
+                        log_writer=log, audit_db=audit, cache=cache,
+                        max_pages=15, wiki_root=tmp_wiki)
+
+    with patch.object(agent._skill_agent, "extract", return_value=mock_extracted):
+        first = await agent.ingest(url)
+        second = await agent.ingest(url)
+
+    assert not first.skipped, "first ingest must create or update a page"
+    assert first.pages_created or first.pages_updated
+    assert second.skipped, "second ingest of same URL must be skipped"
+    assert second.skip_reason == "already ingested"

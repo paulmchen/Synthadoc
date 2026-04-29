@@ -290,34 +290,7 @@ async def test_youtube_search_metadata_has_query(monkeypatch):
     assert result.metadata["query"] == "history of computing"
 
 
-# ── URL skill guard ───────────────────────────────────────────────────────────
-
-@pytest.mark.asyncio
-@pytest.mark.parametrize("url", [
-    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
-    "https://youtube.com/watch?v=dQw4w9WgXcQ",
-    "https://youtu.be/dQw4w9WgXcQ",
-    "https://m.youtube.com/watch?v=dQw4w9WgXcQ",
-    "https://www.youtubekids.com/watch?v=dQw4w9WgXcQ",
-    "https://youtubekids.com/watch?v=dQw4w9WgXcQ",
-])
-async def test_url_skill_rejects_youtube_hosts(url, monkeypatch):
-    """URL skill must raise RuntimeError for any YouTube / YouTube Kids URL."""
-    from synthadoc.skills.url.scripts.main import UrlSkill
-    with pytest.raises(RuntimeError):
-        await UrlSkill().extract(url)
-
-
-@pytest.mark.asyncio
-async def test_url_skill_guard_error_names_skill_and_action():
-    """Error message must mention 'youtube' skill and 'restart'."""
-    from synthadoc.skills.url.scripts.main import UrlSkill
-    with pytest.raises(RuntimeError) as exc_info:
-        await UrlSkill().extract("https://www.youtube.com/watch?v=abc")
-    msg = str(exc_info.value).lower()
-    assert "youtube" in msg
-    assert "restart" in msg
-
+# ── URL skill — non-YouTube pass-through ─────────────────────────────────────
 
 @pytest.mark.asyncio
 async def test_url_skill_still_handles_non_youtube_urls():

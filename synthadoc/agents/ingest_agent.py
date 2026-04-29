@@ -295,6 +295,10 @@ class IngestAgent:
             p = Path(source.split("?")[0].rstrip("/").split("/")[-1] or "url-source")
             src_hash = hashlib.sha256(source.encode()).hexdigest()
             src_size = len(source.encode())
+            if not force and await self._audit.find_by_hash(src_hash, src_size):
+                result.skipped = True
+                result.skip_reason = "already ingested"
+                return result
 
         # Web search decomposition: detect intent, decompose into keyword sub-queries,
         # fire N parallel Tavily searches, deduplicate URLs across results.
