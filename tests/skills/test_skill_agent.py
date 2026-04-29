@@ -195,3 +195,41 @@ def test_youtube_in_builtin_skills(tmp_wiki):
     agent = SkillAgent(wiki_root=tmp_wiki)
     names = [s.name for s in agent.list_skills()]
     assert "youtube" in names
+
+
+def test_youtube_kids_url_routes_to_youtube_skill(tmp_wiki):
+    """YouTube Kids URLs must route to the youtube skill, not the url skill."""
+    from synthadoc.agents.skill_agent import SkillAgent
+    agent = SkillAgent(wiki_root=tmp_wiki)
+    assert agent.detect_skill("https://www.youtubekids.com/watch?v=abc123").name == "youtube"
+
+
+# ── YouTube intent → web_search routing ──────────────────────────────────────
+
+@pytest.mark.parametrize("source", [
+    "youtube Moore's Law",
+    "youtube video on transistors",
+    "youtube kids: Sesame Street",
+    "search for youtube: history of computing",
+    "search youtube: Alan Turing",
+    "search youtube for: Grace Hopper",
+    "youtube search: ENIAC",
+    "youtube lecture on deep learning",
+    "youtube talk: Linus Torvalds",
+])
+def test_youtube_intent_routes_to_web_search(source, tmp_wiki):
+    """Any 'youtube <topic>' phrase (not a URL) must route to the web_search skill."""
+    from synthadoc.agents.skill_agent import SkillAgent
+    agent = SkillAgent(wiki_root=tmp_wiki)
+    assert agent.detect_skill(source).name == "web_search", (
+        f"Expected web_search for {source!r}"
+    )
+
+
+def test_youtube_url_still_routes_to_youtube_skill_not_web_search(tmp_wiki):
+    """Actual YouTube URLs must still go to the youtube skill (URL prefix wins over intent)."""
+    from synthadoc.agents.skill_agent import SkillAgent
+    agent = SkillAgent(wiki_root=tmp_wiki)
+    assert agent.detect_skill("https://www.youtube.com/watch?v=O5nskjZ_GoI").name == "youtube"
+    assert agent.detect_skill("https://youtu.be/O5nskjZ_GoI").name == "youtube"
+    assert agent.detect_skill("https://www.youtubekids.com/watch?v=abc").name == "youtube"

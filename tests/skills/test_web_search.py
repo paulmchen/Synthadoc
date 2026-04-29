@@ -58,7 +58,7 @@ async def test_web_search_extracts_query_from_intent(source, expected_query, mon
 
     captured_query = []
 
-    async def capture_search(query, max_results, api_key):
+    async def capture_search(query, max_results, api_key, include_domains=None):
         captured_query.append(query)
         return _make_tavily_response(1)
 
@@ -79,7 +79,7 @@ async def test_web_search_respects_max_results(monkeypatch):
 
     captured = []
 
-    async def capture(query, max_results, api_key):
+    async def capture(query, max_results, api_key, include_domains=None):
         captured.append(max_results)
         return _make_tavily_response(7)
 
@@ -149,3 +149,185 @@ async def test_web_search_missing_api_key_raises(monkeypatch):
     skill = WebSearchSkill()
     with pytest.raises(EnvironmentError, match="TAVILY_API_KEY"):
         await skill.extract("search for: test")
+
+
+# ── YouTube-specific web search ───────────────────────────────────────────────
+
+def _make_youtube_response(n: int = 2) -> dict:
+    return {
+        "results": [
+            {"url": f"https://www.youtube.com/watch?v=vid{i}",
+             "content": f"Transcript {i}", "title": f"YouTube Video {i}"}
+            for i in range(n)
+        ]
+    }
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source,expected_query", [
+    # The four key use cases from the design discussion
+    ("youtube Moore's Law",                      "Moore's Law"),
+    ("youtube video on transistors",             "on transistors"),
+    ("youtube kids: Sesame Street",              "Sesame Street"),
+    ("search for youtube: history of computing", "history of computing"),
+    # Additional variants
+    ("search youtube: Alan Turing",              "Alan Turing"),
+    ("search youtube for: Grace Hopper",         "Grace Hopper"),
+    ("youtube search: ENIAC",                    "ENIAC"),
+    ("youtube lecture on deep learning",         "on deep learning"),
+    ("youtube talk: Linus Torvalds",             "Linus Torvalds"),
+    ("youtube channel: MIT OpenCourseWare",      "MIT OpenCourseWare"),
+    # Mixed case
+    ("YouTube Moore's Law",                      "Moore's Law"),
+    ("YOUTUBE KIDS: Sesame Street",              "Sesame Street"),
+    ("Search For YouTube: Ada Lovelace",         "Ada Lovelace"),
+])
+async def test_youtube_search_strips_prefix_from_query(source, expected_query, monkeypatch):
+    """YouTube intent prefix is fully stripped; clean query is sent to Tavily."""
+    monkeypatch.setenv("TAVILY_API_KEY", "test-key")
+
+    from synthadoc.skills.web_search.scripts.main import WebSearchSkill
+    from synthadoc.skills.web_search.scripts import fetcher
+
+    captured = []
+
+    async def capture(query, max_results, api_key, include_domains=None):
+        captured.append(query)
+        return _make_youtube_response(1)
+
+    with patch.object(fetcher, "search_tavily", side_effect=capture):
+        await WebSearchSkill().extract(source)
+
+    assert captured[0] == expected_query
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", [
+    "youtube Moore's Law",
+    "youtube video on transistors",
+    "youtube kids: Sesame Street",
+    "search for youtube: history of computing",
+    "search youtube: Alan Turing",
+    "youtube search: ENIAC",
+])
+async def test_youtube_search_passes_include_domains(source, monkeypatch):
+    """Every YouTube intent variant passes include_domains=youtube to Tavily."""
+    monkeypatch.setenv("TAVILY_API_KEY", "test-key")
+
+    from synthadoc.skills.web_search.scripts.main import WebSearchSkill
+    from synthadoc.skills.web_search.scripts import fetcher
+
+    captured = []
+
+    async def capture(query, max_results, api_key, include_domains=None):
+        captured.append(include_domains)
+        return _make_youtube_response(1)
+
+    with patch.object(fetcher, "search_tavily", side_effect=capture):
+        await WebSearchSkill().extract(source)
+
+    assert captured[0] is not None, "include_domains must not be None for YouTube search"
+    assert "youtube.com" in captured[0]
+    assert "youtu.be" in captured[0]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("source", [
+    "search for: Moore's Law",
+    "look up: Alan Turing",
+    "find on the web: ENIAC history",
+    "web search: Grace Hopper",
+    "browse: transistor scaling",
+])
+async def test_generic_search_does_not_pass_include_domains(source, monkeypatch):
+    """Generic web search must not pass include_domains — Tavily searches all domains."""
+    monkeypatch.setenv("TAVILY_API_KEY", "test-key")
+
+    from synthadoc.skills.web_search.scripts.main import WebSearchSkill
+    from synthadoc.skills.web_search.scripts import fetcher
+
+    captured = []
+
+    async def capture(query, max_results, api_key, include_domains=None):
+        captured.append(include_domains)
+        return _make_tavily_response(1)
+
+    with patch.object(fetcher, "search_tavily", side_effect=capture):
+        await WebSearchSkill().extract(source)
+
+    assert captured[0] is None, f"include_domains must be None for generic search: {source!r}"
+
+
+@pytest.mark.asyncio
+async def test_youtube_search_returns_youtube_child_sources(monkeypatch):
+    """YouTube search child_sources are all YouTube URLs."""
+    monkeypatch.setenv("TAVILY_API_KEY", "test-key")
+
+    from synthadoc.skills.web_search.scripts.main import WebSearchSkill
+    from synthadoc.skills.web_search.scripts import fetcher
+
+    with patch.object(fetcher, "search_tavily",
+                      new=AsyncMock(return_value=_make_youtube_response(3))):
+        result = await WebSearchSkill().extract("youtube Moore's Law")
+
+    assert len(result.metadata["child_sources"]) == 3
+    assert all("youtube.com" in url for url in result.metadata["child_sources"])
+    assert result.metadata["query"] == "Moore's Law"
+
+
+@pytest.mark.asyncio
+async def test_youtube_search_metadata_has_query(monkeypatch):
+    """Metadata query field reflects the stripped query, not the full source."""
+    monkeypatch.setenv("TAVILY_API_KEY", "test-key")
+
+    from synthadoc.skills.web_search.scripts.main import WebSearchSkill
+    from synthadoc.skills.web_search.scripts import fetcher
+
+    with patch.object(fetcher, "search_tavily",
+                      new=AsyncMock(return_value=_make_youtube_response(1))):
+        result = await WebSearchSkill().extract("search for youtube: history of computing")
+
+    assert result.metadata["query"] == "history of computing"
+
+
+# ── URL skill guard ───────────────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("url", [
+    "https://www.youtube.com/watch?v=dQw4w9WgXcQ",
+    "https://youtube.com/watch?v=dQw4w9WgXcQ",
+    "https://youtu.be/dQw4w9WgXcQ",
+    "https://m.youtube.com/watch?v=dQw4w9WgXcQ",
+    "https://www.youtubekids.com/watch?v=dQw4w9WgXcQ",
+    "https://youtubekids.com/watch?v=dQw4w9WgXcQ",
+])
+async def test_url_skill_rejects_youtube_hosts(url, monkeypatch):
+    """URL skill must raise RuntimeError for any YouTube / YouTube Kids URL."""
+    from synthadoc.skills.url.scripts.main import UrlSkill
+    with pytest.raises(RuntimeError):
+        await UrlSkill().extract(url)
+
+
+@pytest.mark.asyncio
+async def test_url_skill_guard_error_names_skill_and_action():
+    """Error message must mention 'youtube' skill and 'restart'."""
+    from synthadoc.skills.url.scripts.main import UrlSkill
+    with pytest.raises(RuntimeError) as exc_info:
+        await UrlSkill().extract("https://www.youtube.com/watch?v=abc")
+    msg = str(exc_info.value).lower()
+    assert "youtube" in msg
+    assert "restart" in msg
+
+
+@pytest.mark.asyncio
+async def test_url_skill_still_handles_non_youtube_urls():
+    """Non-YouTube URLs must still be processed normally."""
+    import respx, httpx
+    from synthadoc.skills.url.scripts.main import UrlSkill
+    with respx.mock:
+        respx.get("https://example.com/article").mock(
+            return_value=httpx.Response(
+                200, text="<html><body><p>Article content</p></body></html>")
+        )
+        result = await UrlSkill().extract("https://example.com/article")
+    assert "Article content" in result.text

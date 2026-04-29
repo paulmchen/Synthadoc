@@ -21,6 +21,15 @@ _HEADERS = {
 # HTTP status codes that indicate bot/access blocking (not transient errors)
 _BLOCKED_STATUSES = {403, 401, 429}
 
+# Hostnames that belong to dedicated skills.  If the URL skill receives one of
+# these it means the registry is stale (server started before the skill was
+# installed).  Raise a retryable error so the job is visible in the jobs list
+# rather than silently scraping platform HTML.
+_SKILL_OWNED_HOSTS = {
+    "www.youtube.com", "youtube.com", "youtu.be", "m.youtube.com",
+    "www.youtubekids.com", "youtubekids.com",
+}
+
 # macOS Python (python.org installer) doesn't use the system keychain.
 # certifi ships its own CA bundle that covers the vast majority of public sites.
 import ssl as _ssl
@@ -40,6 +49,14 @@ class UrlSkill(BaseSkill):
         self._fetch_timeout = fetch_timeout
 
     async def extract(self, source: str) -> ExtractedContent:
+        hostname = urlparse(source).hostname or ""
+        if hostname in _SKILL_OWNED_HOSTS:
+            raise RuntimeError(
+                f"URL skill received a URL for '{hostname}' ({source}). "
+                "The 'youtube' skill should handle this — it is not loaded in the "
+                "current registry. Restart the server to pick up recently installed "
+                "skills, then retry this job."
+            )
         try:
             async with httpx.AsyncClient(
                 follow_redirects=True, timeout=self._fetch_timeout, headers=_HEADERS, verify=_SSL_CONTEXT

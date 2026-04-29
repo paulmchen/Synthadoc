@@ -9,10 +9,8 @@ triggers:
   extensions:
     - "https://www.youtube.com/"
     - "https://youtu.be/"
-  intents:
-    - "youtube video"
-    - "youtube lecture"
-    - "youtube talk"
+    - "https://www.youtubekids.com/"
+  intents: []
 requires:
   - youtube-transcript-api
 author: axoviq.com
@@ -26,8 +24,19 @@ caption system — no API key or audio download required.
 
 ## When this skill is used
 
-- Source starts with `https://www.youtube.com/` or `https://youtu.be/`
-- User intent contains: `youtube video`, `youtube lecture`, `youtube talk`
+- Source starts with `https://www.youtube.com/`, `https://youtu.be/`, or
+  `https://www.youtubekids.com/`
+
+To search YouTube by topic instead of ingesting a specific URL, use the web
+search skill — it filters Tavily results to YouTube domains automatically:
+
+```bash
+synthadoc ingest "youtube Moore's Law"
+synthadoc ingest "youtube kids: Sesame Street"
+synthadoc ingest "search for youtube: history of computing"
+```
+
+Each YouTube URL returned by Tavily is then ingested by this skill.
 
 ## Limitations
 
