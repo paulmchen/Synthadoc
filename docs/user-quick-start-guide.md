@@ -463,7 +463,7 @@ If the page content quality is poor, delete `wiki/konrad-zuse.md` from Obsidian 
 re-ingest with a better source document:
 
 ```bash
-synthadoc ingest raw_sources/konrad-zuse-z3-computer.md --force
+synthadoc ingest raw_sources/konrad-zuse-z3-computer.md
 ```
 
 ---
