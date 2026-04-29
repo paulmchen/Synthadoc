@@ -979,3 +979,43 @@ async def test_youtube_rerun_same_url_is_skipped(tmp_wiki, mock_provider):
     assert first.pages_created or first.pages_updated
     assert second.skipped, "second ingest of same URL must be skipped"
     assert second.skip_reason == "already ingested"
+
+
+@pytest.mark.asyncio
+async def test_youtube_rerun_allowed_after_page_deleted(tmp_wiki, mock_provider):
+    """Re-ingesting a URL must succeed (not be skipped) if the wiki page was deleted."""
+    from unittest.mock import patch
+    from synthadoc.skills.base import ExtractedContent
+
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    log = LogWriter(tmp_wiki / "wiki" / "log.md")
+    audit = AuditDB(tmp_wiki / ".synthadoc" / "audit.db")
+    await audit.init()
+    cache = CacheManager(tmp_wiki / ".synthadoc" / "cache.db")
+    await cache.init()
+
+    url = "https://www.youtube.com/watch?v=O5nskjZ_GoI"
+    mock_extracted = ExtractedContent(
+        text="[0:00] Hello world.",
+        source_path=url,
+        metadata={"url": url, "video_id": "O5nskjZ_GoI"},
+    )
+
+    agent = IngestAgent(provider=mock_provider, store=store, search=search,
+                        log_writer=log, audit_db=audit, cache=cache,
+                        max_pages=15, wiki_root=tmp_wiki)
+
+    with patch.object(agent._skill_agent, "extract", return_value=mock_extracted):
+        first = await agent.ingest(url)
+
+    assert first.pages_created, "first ingest must create a page"
+    slug = first.pages_created[0]
+
+    # Simulate user deleting the page from the UI
+    (tmp_wiki / "wiki" / f"{slug}.md").unlink()
+
+    with patch.object(agent._skill_agent, "extract", return_value=mock_extracted):
+        third = await agent.ingest(url)
+
+    assert not third.skipped, "re-ingest after page deletion must not be skipped"

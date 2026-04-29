@@ -255,6 +255,14 @@ class IngestAgent:
         """Return True when source must exist as a local file before ingestion."""
         return self._skill_agent.needs_path_resolution(source)
 
+    async def _already_ingested(self, src_hash: str, src_size: int) -> bool:
+        """Return True only if this source was ingested AND its wiki page still exists."""
+        existing = await self._audit.find_by_hash(src_hash, src_size)
+        if not existing:
+            return False
+        wiki_page = existing.get("wiki_page", "")
+        return not wiki_page or self._store.page_exists(wiki_page)
+
     async def ingest(self, source: str, force: bool = False, bust_cache: bool = False) -> IngestResult:
         result = IngestResult(source=source)
 
@@ -288,7 +296,7 @@ class IngestAgent:
                         "(existing=%d, current=%d). Treating as new source.",
                         src_hash, existing["size"], src_size
                     )
-                elif await self._audit.find_by_hash(src_hash, src_size):
+                elif await self._already_ingested(src_hash, src_size):
                     result.skipped = True
                     result.skip_reason = "already ingested"
                     return result
@@ -299,7 +307,7 @@ class IngestAgent:
             p = Path(source.split("?")[0].rstrip("/").split("/")[-1] or "url-source")
             src_hash = hashlib.sha256(source.encode()).hexdigest()
             src_size = len(source.encode())
-            if not force and await self._audit.find_by_hash(src_hash, src_size):
+            if not force and await self._already_ingested(src_hash, src_size):
                 result.skipped = True
                 result.skip_reason = "already ingested"
                 return result
