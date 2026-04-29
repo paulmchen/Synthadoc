@@ -154,3 +154,44 @@ def test_needs_path_resolution_returns_true_for_relative_paths(tmp_wiki):
     # Use paths with no extension and no skill intent keywords in the string.
     assert agent.needs_path_resolution("raw_sources/my-transcript") is True
     assert agent.needs_path_resolution("uploads/batch-001") is True
+
+
+# ── YouTube URL routing ───────────────────────────────────────────────────────
+
+def test_youtube_url_routes_to_youtube_skill(tmp_wiki):
+    """https://www.youtube.com/... must route to youtube, not url."""
+    from synthadoc.agents.skill_agent import SkillAgent
+    agent = SkillAgent(wiki_root=tmp_wiki)
+    assert agent.detect_skill("https://www.youtube.com/watch?v=dQw4w9WgXcQ").name == "youtube"
+
+
+def test_youtu_be_url_routes_to_youtube_skill(tmp_wiki):
+    """Short youtu.be URLs must route to youtube skill."""
+    from synthadoc.agents.skill_agent import SkillAgent
+    agent = SkillAgent(wiki_root=tmp_wiki)
+    assert agent.detect_skill("https://youtu.be/dQw4w9WgXcQ").name == "youtube"
+
+
+def test_youtube_beats_url_skill_longest_prefix(tmp_wiki):
+    """Longest-prefix rule: youtube (28 chars) must beat url (8 chars)."""
+    from synthadoc.agents.skill_agent import SkillAgent
+    agent = SkillAgent(wiki_root=tmp_wiki)
+    skill = agent.detect_skill("https://www.youtube.com/watch?v=abc123")
+    assert skill.name == "youtube"
+    assert agent.detect_skill("https://example.com/article").name == "url"
+
+
+def test_generic_https_still_routes_to_url_skill(tmp_wiki):
+    """Non-YouTube https:// URLs must still go to the url skill."""
+    from synthadoc.agents.skill_agent import SkillAgent
+    agent = SkillAgent(wiki_root=tmp_wiki)
+    assert agent.detect_skill("https://en.wikipedia.org/wiki/Turing").name == "url"
+    assert agent.detect_skill("https://arxiv.org/abs/1234.5678").name == "url"
+
+
+def test_youtube_in_builtin_skills(tmp_wiki):
+    """youtube must appear in the built-in skill registry."""
+    from synthadoc.agents.skill_agent import SkillAgent
+    agent = SkillAgent(wiki_root=tmp_wiki)
+    names = [s.name for s in agent.list_skills()]
+    assert "youtube" in names
