@@ -7,6 +7,28 @@ import logging
 from urllib.parse import urlparse, parse_qs
 
 from synthadoc.skills.base import BaseSkill, ExtractedContent, SkillMeta
+import re
+
+_CJK_RE = re.compile(
+    r'[一-鿿぀-ゟ゠-ヿ가-힯]'
+)
+
+_YOUTUBE_SUMMARY_PROMPT = (
+    "Summarise this YouTube video transcript for a knowledge wiki.\n"
+    "Write no more than {limit} words.\n"
+    "- One or two sentences: what the video is about\n"
+    "- Bullet list: main topics covered\n"
+    "- One sentence: key takeaway\n\n"
+    "Markdown bullets only. No headings. No filler phrases.\n\n"
+    "Transcript:\n{transcript}"
+)
+
+
+def _is_cjk_dominant(text: str) -> bool:
+    if not text:
+        return False
+    return len(_CJK_RE.findall(text)) / len(text) > 0.10
+
 
 logger = logging.getLogger(__name__)
 

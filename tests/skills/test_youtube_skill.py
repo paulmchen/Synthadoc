@@ -140,3 +140,25 @@ async def test_transcript_text_contains_timestamps():
     assert "[0:00] Moore's Law." in result.text
     assert "[1:30] Transistor scaling." in result.text
     assert "[61:01] End of scaling." in result.text
+
+
+def test_is_cjk_dominant_true():
+    from synthadoc.skills.youtube.scripts.main import _is_cjk_dominant
+    assert _is_cjk_dominant("这是一段中文文字，用于测试CJK字符检测功能。") is True
+
+
+def test_is_cjk_dominant_false():
+    from synthadoc.skills.youtube.scripts.main import _is_cjk_dominant
+    assert _is_cjk_dominant("This is plain English text with no CJK characters.") is False
+
+
+def test_is_cjk_dominant_mixed_under_threshold():
+    from synthadoc.skills.youtube.scripts.main import _is_cjk_dominant
+    # 1 CJK char in 100 chars total = 1% — below 10% threshold
+    text = "A" * 99 + "中"
+    assert _is_cjk_dominant(text) is False
+
+
+def test_is_cjk_dominant_empty_string():
+    from synthadoc.skills.youtube.scripts.main import _is_cjk_dominant
+    assert _is_cjk_dominant("") is False
