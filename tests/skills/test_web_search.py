@@ -371,3 +371,36 @@ async def test_search_tavily_returns_raw_client_response():
         result = await search_tavily("test", max_results=1, api_key="key")
 
     assert result is expected
+
+
+# ── _load_dynamic_blocked ─────────────────────────────────────────────────────
+
+def test_load_dynamic_blocked_returns_empty_when_wiki_root_not_set(monkeypatch):
+    """Returns empty set when SYNTHADOC_WIKI_ROOT is unset."""
+    monkeypatch.delenv("SYNTHADOC_WIKI_ROOT", raising=False)
+    from synthadoc.skills.web_search.scripts.main import _load_dynamic_blocked
+    assert _load_dynamic_blocked() == set()
+
+
+def test_load_dynamic_blocked_loads_domains_from_json(tmp_path, monkeypatch):
+    """Returns the domain set when blocked_domains.json exists and is valid JSON."""
+    blocked_file = tmp_path / ".synthadoc" / "blocked_domains.json"
+    blocked_file.parent.mkdir(parents=True)
+    blocked_file.write_text('["bad-site.com", "spam.org"]', encoding="utf-8")
+    monkeypatch.setenv("SYNTHADOC_WIKI_ROOT", str(tmp_path))
+    from synthadoc.skills.web_search.scripts import main as ws_main
+    import importlib
+    importlib.reload(ws_main)
+    result = ws_main._load_dynamic_blocked()
+    assert "bad-site.com" in result
+    assert "spam.org" in result
+
+
+def test_load_dynamic_blocked_returns_empty_on_invalid_json(tmp_path, monkeypatch):
+    """Returns empty set when blocked_domains.json exists but contains invalid JSON."""
+    blocked_file = tmp_path / ".synthadoc" / "blocked_domains.json"
+    blocked_file.parent.mkdir(parents=True)
+    blocked_file.write_text("not valid json {{", encoding="utf-8")
+    monkeypatch.setenv("SYNTHADOC_WIKI_ROOT", str(tmp_path))
+    from synthadoc.skills.web_search.scripts.main import _load_dynamic_blocked
+    assert _load_dynamic_blocked() == set()
