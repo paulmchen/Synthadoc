@@ -175,7 +175,10 @@ class IngestAgent:
         self._max_pages = max_pages
         self._wiki_root = Path(wiki_root) if wiki_root is not None else None
         self._cache_version = cache_version
-        self._skill_agent = SkillAgent(skill_kwargs={"url": {"fetch_timeout": fetch_timeout}})
+        self._skill_agent = SkillAgent(skill_kwargs={
+            "url": {"fetch_timeout": fetch_timeout},
+            "youtube": {"provider": self._provider},
+        })
         self._purpose = self._load_purpose()
 
     async def _analyse(self, text: str, bust_cache: bool = False) -> dict:
@@ -466,13 +469,21 @@ class IngestAgent:
                     with self._store.page_lock(slug):
                         page = self._store.read_page(slug)
                         if page:
-                            section = f"## From {p.name}\n\n{text[:1500]}"
+                            if extracted.metadata.get("has_summary"):
+                                section = extracted.text
+                            else:
+                                section = f"## From {p.name}\n\n{text[:1500]}"
                             page.content = page.content.rstrip() + f"\n\n{section}"
                             self._store.write_page(slug, page)
                             self._search.invalidate_index()
                     result.pages_updated.append(slug)
                 else:
-                    body = page_content.strip() if page_content.strip() else f"# {title}\n\n{text[:4000]}"
+                    if extracted.metadata.get("has_summary"):
+                        body = extracted.text
+                    elif page_content.strip():
+                        body = page_content.strip()
+                    else:
+                        body = f"# {title}\n\n{text[:4000]}"
                     new_page = WikiPage(
                         title=title, tags=tags,
                         content=body,
