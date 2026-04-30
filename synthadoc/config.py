@@ -388,8 +388,19 @@ def load_config(
         any_file_loaded = True
 
     if project_config is not None and Path(project_config).exists():
-        with open(project_config, "rb") as fh:
-            project_raw = tomllib.load(fh)
+        try:
+            with open(project_config, "rb") as fh:
+                project_raw = tomllib.load(fh)
+        except tomllib.TOMLDecodeError as exc:
+            msg = str(exc)
+            if "cannot overwrite" in msg.lower():
+                raise ValueError(
+                    f"[ERR-CFG-003] Duplicate key in {project_config}.\n"
+                    f"Only one 'default' line may be active under [agents] at a time.\n"
+                    f"Comment out all but one provider and restart the server.\n"
+                    f"(TOML error: {exc})"
+                ) from exc
+            raise ValueError(f"[ERR-CFG-003] Invalid TOML in {project_config}: {exc}") from exc
         raw = _merge(raw, project_raw)
         any_file_loaded = True
 
