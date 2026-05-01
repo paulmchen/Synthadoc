@@ -997,7 +997,7 @@ class AuditCostsModal extends Modal {
                 summary.style.cssText = "margin-bottom:16px";
                 summary.createEl("p", {
                     text: `Total: ${(r.total_tokens ?? 0).toLocaleString()} tokens · $${(r.total_cost_usd ?? 0).toFixed(4)} USD`,
-                }).style.cssText = "font-weight:bold";
+                }).style.cssText = "font-weight:bold;-webkit-user-select:text;user-select:text";
 
                 if (r.daily?.length) {
                     const table = out.createEl("table");
