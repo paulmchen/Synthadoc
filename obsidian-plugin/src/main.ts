@@ -273,6 +273,47 @@ const STATUS_EMOJI: Record<string, string> = {
 
 const STATUS_FILTER_OPTIONS = ["pending", "in_progress", "completed", "failed", "skipped", "dead"] as const;
 
+function makeDraggable(modalEl: HTMLElement): void {
+    modalEl.style.position = "fixed";
+    modalEl.style.cursor = "default";
+    let dragging = false;
+    let startX = 0, startY = 0, origLeft = 0, origTop = 0;
+
+    modalEl.addEventListener("mousedown", (e: MouseEvent) => {
+        // Only drag when clicking the modal itself, not inputs/buttons/textareas inside it
+        const tag = (e.target as HTMLElement).tagName.toLowerCase();
+        if (["input", "textarea", "button", "select", "a", "label"].includes(tag)) return;
+        dragging = true;
+        startX = e.clientX;
+        startY = e.clientY;
+        const rect = modalEl.getBoundingClientRect();
+        origLeft = rect.left;
+        origTop = rect.top;
+        // Switch from transform-based centering to explicit coordinates
+        modalEl.style.transform = "none";
+        modalEl.style.left = origLeft + "px";
+        modalEl.style.top = origTop + "px";
+        modalEl.style.margin = "0";
+        modalEl.style.cursor = "grabbing";
+        e.preventDefault();
+    });
+
+    document.addEventListener("mousemove", (e: MouseEvent) => {
+        if (!dragging) return;
+        const dx = e.clientX - startX;
+        const dy = e.clientY - startY;
+        modalEl.style.left = (origLeft + dx) + "px";
+        modalEl.style.top  = (origTop  + dy) + "px";
+    });
+
+    document.addEventListener("mouseup", () => {
+        if (dragging) {
+            dragging = false;
+            modalEl.style.cursor = "default";
+        }
+    });
+}
+
 class JobsModal extends Modal {
     private _selected: Set<string> = new Set(["pending", "in_progress"]);
     private _intervalSecs = 10;
@@ -285,6 +326,7 @@ class JobsModal extends Modal {
         this.modalEl.style.width = "clamp(560px, 65vw, 900px)";
         const bg = this.containerEl.querySelector(".modal-bg") as HTMLElement | null;
         if (bg) bg.addEventListener("click", (e) => e.stopImmediatePropagation(), { capture: true });
+        makeDraggable(this.modalEl);
 
         const { contentEl } = this;
         contentEl.createEl("h3", { text: "Synthadoc: Jobs" });
@@ -445,6 +487,7 @@ class LintReportModal extends Modal {
     onOpen() {
         const bg = this.containerEl.querySelector(".modal-bg") as HTMLElement | null;
         if (bg) bg.addEventListener("click", (e) => e.stopImmediatePropagation(), { capture: true });
+        makeDraggable(this.modalEl);
 
         const { contentEl } = this;
         contentEl.createEl("h3", { text: "Synthadoc: Lint report" });
@@ -497,6 +540,7 @@ class IngestUrlModal extends Modal {
     onOpen() {
         const bg = this.containerEl.querySelector(".modal-bg") as HTMLElement | null;
         if (bg) bg.addEventListener("click", (e) => e.stopImmediatePropagation(), { capture: true });
+        makeDraggable(this.modalEl);
 
         const { contentEl } = this;
         contentEl.createEl("h3", { text: "Synthadoc: Ingest from URL" });
@@ -536,6 +580,7 @@ class WebSearchModal extends Modal {
     onOpen() {
         const bg = this.containerEl.querySelector(".modal-bg") as HTMLElement | null;
         if (bg) bg.addEventListener("click", (e) => e.stopImmediatePropagation(), { capture: true });
+        makeDraggable(this.modalEl);
 
         const { contentEl } = this;
         contentEl.createEl("h3", { text: "Synthadoc: Web search" });
@@ -711,6 +756,7 @@ class RetryJobModal extends Modal {
     onOpen() {
         const bg = this.containerEl.querySelector(".modal-bg") as HTMLElement | null;
         if (bg) bg.addEventListener("click", (e) => e.stopImmediatePropagation(), { capture: true });
+        makeDraggable(this.modalEl);
 
         const { contentEl } = this;
         contentEl.createEl("h3", { text: "Synthadoc: Retry dead job" });
@@ -770,6 +816,7 @@ class PurgeJobsModal extends Modal {
     onOpen() {
         const bg = this.containerEl.querySelector(".modal-bg") as HTMLElement | null;
         if (bg) bg.addEventListener("click", (e) => e.stopImmediatePropagation(), { capture: true });
+        makeDraggable(this.modalEl);
 
         const { contentEl } = this;
         contentEl.createEl("h3", { text: "Synthadoc: Purge old jobs" });
@@ -808,6 +855,7 @@ class ScaffoldModal extends Modal {
     onOpen() {
         const bg = this.containerEl.querySelector(".modal-bg") as HTMLElement | null;
         if (bg) bg.addEventListener("click", (e) => e.stopImmediatePropagation(), { capture: true });
+        makeDraggable(this.modalEl);
 
         const { contentEl } = this;
         contentEl.createEl("h3", { text: "Synthadoc: Regenerate scaffold" });
@@ -858,6 +906,7 @@ class AuditHistoryModal extends Modal {
         this.modalEl.style.width = "clamp(520px, 65vw, 900px)";
         const bg = this.containerEl.querySelector(".modal-bg") as HTMLElement | null;
         if (bg) bg.addEventListener("click", (e) => e.stopImmediatePropagation(), { capture: true });
+        makeDraggable(this.modalEl);
 
         const { contentEl } = this;
         contentEl.createEl("h3", { text: "Synthadoc: Ingest history" });
@@ -923,6 +972,7 @@ class AuditCostsModal extends Modal {
     onOpen() {
         const bg = this.containerEl.querySelector(".modal-bg") as HTMLElement | null;
         if (bg) bg.addEventListener("click", (e) => e.stopImmediatePropagation(), { capture: true });
+        makeDraggable(this.modalEl);
 
         const { contentEl } = this;
         contentEl.createEl("h3", { text: "Synthadoc: Cost summary" });
@@ -986,6 +1036,7 @@ class QueryHistoryModal extends Modal {
         this.modalEl.style.width = "clamp(520px, 65vw, 900px)";
         const bg = this.containerEl.querySelector(".modal-bg") as HTMLElement | null;
         if (bg) bg.addEventListener("click", (e) => e.stopImmediatePropagation(), { capture: true });
+        makeDraggable(this.modalEl);
 
         const { contentEl } = this;
         contentEl.createEl("h3", { text: "Synthadoc: Query history" });
@@ -1054,6 +1105,7 @@ class QueryModal extends Modal {
         // Block the backdrop's built-in click-to-close so the user must close explicitly
         const bg = this.containerEl.querySelector(".modal-bg") as HTMLElement | null;
         if (bg) bg.addEventListener("click", (e) => e.stopImmediatePropagation(), { capture: true });
+        makeDraggable(this.modalEl);
 
         const { contentEl } = this;
         contentEl.createEl("h3", { text: "Synthadoc: Query your wiki" });
