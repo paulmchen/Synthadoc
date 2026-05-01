@@ -263,11 +263,12 @@ class SynthadocSettingTab extends PluginSettingTab {
 }
 
 const STATUS_EMOJI: Record<string, string> = {
-    pending:   "⏳",
-    running:   "▶",
-    completed: "✅",
-    failed:    "❌",
-    dead:      "💀",
+    pending:     "🕐",
+    in_progress: "⏳",
+    completed:   "✅",
+    failed:      "❌",
+    skipped:     "⏭️",
+    dead:        "💀",
 };
 
 const STATUS_FILTER_OPTIONS = ["pending", "in_progress", "completed", "failed", "skipped", "dead"] as const;
