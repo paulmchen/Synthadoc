@@ -427,7 +427,7 @@ class JobsModal extends Modal {
         }
 
         const table = this._tableEl.createEl("table");
-        table.style.cssText = "width:100%;border-collapse:collapse;font-size:13px";
+        table.style.cssText = "width:100%;border-collapse:collapse;font-size:13px;-webkit-user-select:text;user-select:text";
 
         const hrow = table.createEl("thead").createEl("tr");
         for (const h of ["Job ID", "Status", "Operation", "Source", "Created"]) {
@@ -447,11 +447,10 @@ class JobsModal extends Modal {
                 : "—";
             const icon = STATUS_EMOJI[job.status] ?? "";
 
-            // Job ID cell — monospace, muted, truncated to 8 chars for readability
+            // Job ID cell — monospace, full ID visible and selectable for copy
             const idTd = tr.createEl("td");
             idTd.style.cssText = "padding:4px 8px;border-bottom:1px solid var(--background-modifier-border-subtle);font-family:monospace;font-size:11px;color:var(--text-muted)";
-            idTd.setText(job.id?.slice(0, 8) ?? "—");
-            idTd.title = job.id ?? "";
+            idTd.setText(job.id ?? "—");
 
             for (const text of [`${icon} ${job.status}`, job.operation, source, created]) {
                 const td = tr.createEl("td", { text });
