@@ -216,6 +216,7 @@ def uninstall_cmd(
     Requires two confirmations: a y/N prompt followed by typing the wiki name.
     There is no --yes flag — this operation is irreversible.
     """
+    name = name.rstrip("/\\")
     registry = _read_registry()
 
     if name not in registry:
