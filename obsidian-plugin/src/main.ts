@@ -26,35 +26,33 @@ export default class SynthadocPlugin extends Plugin {
         setBase(this.settings.serverUrl);
         this.addSettingTab(new SynthadocSettingTab(this.app, this));
 
-        // Commands are named "NN. Group: description" so Obsidian's alphabetical
-        // palette sort produces the desired user-facing order.
         this.addCommand({
             id: "synthadoc-query",
-            name: "01. Query: ask the wiki...",
+            name: "Query: ask the wiki...",
             callback: () => new QueryModal(this.app).open(),
         });
 
         this.addCommand({
             id: "synthadoc-web-search",
-            name: "02. Ingest: web search...",
+            name: "Ingest: web search...",
             callback: () => new WebSearchModal(this.app).open(),
         });
 
         this.addCommand({
             id: "synthadoc-ingest-all",
-            name: "03. Ingest: all sources in folder",
+            name: "Ingest: all sources in folder",
             callback: () => this.ingestAllSources(),
         });
 
         this.addCommand({
             id: "synthadoc-ingest-url",
-            name: "04. Ingest: from URL...",
+            name: "Ingest: from URL...",
             callback: () => new IngestUrlModal(this.app).open(),
         });
 
         this.addCommand({
             id: "synthadoc-ingest-current",
-            name: "05. Ingest: current file",
+            name: "Ingest: current file",
             callback: () => {
                 const file = this.app.workspace.getActiveFile();
                 if (file) {
@@ -67,61 +65,61 @@ export default class SynthadocPlugin extends Plugin {
 
         this.addCommand({
             id: "synthadoc-jobs",
-            name: "06. Jobs: list...",
+            name: "Jobs: list...",
             callback: () => new JobsModal(this.app).open(),
         });
 
         this.addCommand({
             id: "synthadoc-jobs-retry-dead",
-            name: "07. Jobs: retry failed or dead jobs...",
+            name: "Jobs: retry failed or dead jobs...",
             callback: () => new RetryJobModal(this.app).open(),
         });
 
         this.addCommand({
             id: "synthadoc-jobs-purge",
-            name: "08. Jobs: purge old completed/dead...",
+            name: "Jobs: purge old completed/dead...",
             callback: () => new PurgeJobsModal(this.app).open(),
         });
 
         this.addCommand({
             id: "synthadoc-lint-report",
-            name: "09. Lint: report",
+            name: "Lint: report",
             callback: () => new LintReportModal(this.app).open(),
         });
 
         this.addCommand({
             id: "synthadoc-lint",
-            name: "10. Lint: run...",
+            name: "Lint: run...",
             callback: () => new LintRunModal(this.app).open(),
         });
 
         this.addCommand({
             id: "synthadoc-scaffold",
-            name: "11. Wiki: regenerate scaffold...",
+            name: "Wiki: regenerate scaffold...",
             callback: () => new ScaffoldModal(this.app).open(),
         });
 
         this.addCommand({
             id: "synthadoc-audit-costs",
-            name: "12. Audit: cost summary...",
+            name: "Audit: cost summary...",
             callback: () => new AuditCostsModal(this.app).open(),
         });
 
         this.addCommand({
             id: "synthadoc-audit-queries",
-            name: "13. Audit: query history...",
+            name: "Audit: query history...",
             callback: () => new QueryHistoryModal(this.app).open(),
         });
 
         this.addCommand({
             id: "synthadoc-audit-events",
-            name: "14. Audit: events...",
+            name: "Audit: events...",
             callback: () => new AuditEventsModal(this.app).open(),
         });
 
         this.addCommand({
             id: "synthadoc-audit-history",
-            name: "15. Audit: ingest history...",
+            name: "Audit: ingest history...",
             callback: () => new AuditHistoryModal(this.app).open(),
         });
 
