@@ -26,7 +26,7 @@ vi.mock("obsidian", () => ({
     },
     Modal: class {
         app: any;
-        modalEl = { style: {} as CSSStyleDeclaration };
+        modalEl = { style: {} as CSSStyleDeclaration, addEventListener: vi.fn() };
         containerEl = { querySelector: vi.fn().mockReturnValue({ addEventListener: vi.fn() }) };
         contentEl = {
             createEl: vi.fn().mockReturnValue({
@@ -543,7 +543,7 @@ async function getModal(commandId: string): Promise<{ ModalClass: new () => any;
         },
         Modal: class {
             app: any;
-            modalEl = { style: {} as CSSStyleDeclaration };
+            modalEl = { style: {} as CSSStyleDeclaration, addEventListener: vi.fn() };
             containerEl = { querySelector: vi.fn().mockReturnValue({ addEventListener: vi.fn() }) };
             contentEl = makeSmartContentEl();
             open = vi.fn(function (this: any) { lastInstance = this; });
@@ -591,7 +591,7 @@ async function getModal(commandId: string): Promise<{ ModalClass: new () => any;
         constructor() {
             const inst = new CapturedModalClass(undefined);
             inst.contentEl = makeSmartContentEl();
-            inst.modalEl = { style: {} };
+            inst.modalEl = { style: {}, addEventListener: vi.fn() };
             inst.containerEl = { querySelector: vi.fn().mockReturnValue({ addEventListener: vi.fn() }) };
             return inst;
         }

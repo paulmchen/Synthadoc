@@ -274,6 +274,7 @@ const STATUS_EMOJI: Record<string, string> = {
 const STATUS_FILTER_OPTIONS = ["pending", "in_progress", "completed", "failed", "skipped", "dead"] as const;
 
 function makeDraggable(modalEl: HTMLElement): void {
+    if (typeof document === "undefined" || typeof modalEl.addEventListener !== "function") return;
     modalEl.style.position = "fixed";
     modalEl.style.cursor = "default";
     let dragging = false;
