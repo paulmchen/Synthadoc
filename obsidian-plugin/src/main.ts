@@ -710,7 +710,7 @@ class WebSearchModal extends Modal {
                     pagesEl.empty();
                     pagesEl.createEl("p", { text: `Pages (${pages.size}):` }).style.cssText = "font-size:12px;font-weight:bold;margin-bottom:2px";
                     const ul = pagesEl.createEl("ul");
-                    ul.style.cssText = "font-size:12px;margin:0;padding-left:18px";
+                    ul.style.cssText = "font-size:12px;margin:0;padding-left:18px;-webkit-user-select:text;user-select:text";
                     for (const slug of pages) ul.createEl("li", { text: slug });
                 }
 
@@ -718,7 +718,7 @@ class WebSearchModal extends Modal {
                     errorsEl.empty();
                     errorsEl.createEl("p", { text: `Errors (${errors.length}):` }).style.cssText = "font-size:12px;font-weight:bold;margin-bottom:2px;color:var(--text-error)";
                     const ul = errorsEl.createEl("ul");
-                    ul.style.cssText = "font-size:12px;margin:0;padding-left:18px;color:var(--text-error)";
+                    ul.style.cssText = "font-size:12px;margin:0;padding-left:18px;color:var(--text-error);-webkit-user-select:text;user-select:text";
                     for (const err of errors) ul.createEl("li", { text: err });
                 }
 
