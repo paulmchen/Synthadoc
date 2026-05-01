@@ -74,6 +74,7 @@ def resolve_wiki_path(wiki: str) -> Path:
     If neither resolves to an existing directory, returns the path as-is and
     lets the caller surface the error (e.g. Orchestrator will fail clearly).
     """
+    wiki = wiki.rstrip("/\\")
     registry = _read_registry()
     if wiki in registry:
         return Path(registry[wiki]["path"])
@@ -216,7 +217,6 @@ def uninstall_cmd(
     Requires two confirmations: a y/N prompt followed by typing the wiki name.
     There is no --yes flag — this operation is irreversible.
     """
-    name = name.rstrip("/\\")
     registry = _read_registry()
 
     if name not in registry:
