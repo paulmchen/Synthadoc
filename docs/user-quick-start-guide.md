@@ -1,6 +1,6 @@
 ﻿# Synthadoc User Quick-Start Guide
 
-**Version: v0.2.0 (Community Edition)**
+**Version: v0.3.0 (Community Edition)**
 
 This guide walks you through the **History of Computing** demo wiki — a fully wired
 Synthadoc environment with 10 pre-built pages and six raw source files that cover every
@@ -476,6 +476,14 @@ synthadoc ingest raw_sources/konrad-zuse-z3-computer.md
 > **Requires `TAVILY_API_KEY`** — see [Appendix D](#appendix-d--tavily-web-search-key).
 > Without it, web search jobs fail with `[ERR-SKILL-004]`. All other features work normally.
 
+### What's new in v0.3.0
+
+- **Coding tool CLI providers** — set `provider = "claude-code"` or `provider = "opencode"` in `config.toml` to run all agents using your existing Claude Code or Opencode subscription, with no separate API key required. See [Appendix G](#appendix-g--using-claude-code-or-opencode-as-llm-provider) for setup.
+- **YouTube transcript ingest** — ingest any YouTube video (standard or Shorts) by URL. Captions are extracted automatically with no API key, and each page opens with an LLM-generated executive summary followed by a timestamped transcript.
+- **Knowledge gap detection** — improved reliability across multi-aspect queries; CJK (Chinese, Japanese, Korean) queries no longer produce false gap reports.
+- **Session wiki resolution** — `synthadoc use <name>` saves your active wiki so `-w` is optional on every subsequent command.
+- **DeepSeek provider** — eighth LLM provider added; very low text-only rates.
+
 ### What's new in v0.2.0
 
 Synthadoc now **decomposes web search topics** into multiple focused keyword sub-queries
@@ -572,10 +580,12 @@ The modal prepends `search for:` automatically — just type the topic, no prefi
 ## Step 10 — Ingest a YouTube video
 
 Pass any YouTube URL directly — the transcript is extracted automatically from the
-YouTube caption system (no API key, no audio download):
+YouTube caption system (no API key, no audio download). Standard videos and **YouTube
+Shorts** (`https://www.youtube.com/shorts/...`) are both supported:
 
 ```bash
 synthadoc ingest "https://www.youtube.com/watch?v=O5nskjZ_GoI"
+synthadoc ingest "https://youtu.be/O5nskjZ_GoI"              # short-link form
 ```
 
 This ingests *Early Computing: Crash Course Computer Science #1*, which covers Hollerith,

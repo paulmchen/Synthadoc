@@ -65,11 +65,10 @@ class LintAgent:
         self._threshold = confidence_threshold
 
     def _find_orphans(self, slugs: list[str]) -> list[str]:
-        page_texts = {
-            slug: (self._store.read_page(slug).content
-                   if self._store.read_page(slug) else "")
-            for slug in slugs
-        }
+        page_texts = {}
+        for slug in slugs:
+            page = self._store.read_page(slug)
+            page_texts[slug] = page.content if page else ""
         return find_orphan_slugs(page_texts)
 
     async def lint(self, scope: str = "all", auto_resolve: bool = False) -> LintReport:
