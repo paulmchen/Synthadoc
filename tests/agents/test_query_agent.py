@@ -1024,3 +1024,39 @@ async def test_gap_signal5_defining_term_barely_present(tmp_wiki):
     # "quantum" never appears ≥ 2 times in any candidate → min_qualifying=0 → signal 5.
     assert result.knowledge_gap is True
     assert len(result.suggested_searches) >= 1
+
+
+@pytest.mark.asyncio
+async def test_cjk_query_no_false_gap(tmp_wiki):
+    """CJK queries must not trigger spurious knowledge gaps from signals 3–5.
+
+    Chinese text has no whitespace word boundaries, so split() yields the whole
+    sentence as one token.  That token is almost certainly absent from any page
+    (doc_freq=0), which would fire signal 4 even when the wiki fully covers the
+    topic.  The fix detects CJK characters and skips key-term extraction entirely,
+    leaving only the language-agnostic signals 1 and 2 active.
+    """
+    store = WikiStorage(tmp_wiki / "wiki")
+
+    # 5 pages that clearly cover the topic (high BM25 score, ≥ 3 candidates).
+    for i in range(5):
+        store.write_page(f"page-{i}", WikiPage(
+            title=f"Computing {i}", tags=["history"],
+            content="Alan Turing invented the Turing machine. " * 20,
+            status="active", confidence="high", sources=[],
+        ))
+
+    slugs = [f"page-{i}" for i in range(5)]
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.side_effect = [
+        CompletionResponse(text='["图灵机是什么？"]', input_tokens=5, output_tokens=5),
+        CompletionResponse(text="图灵机是一种理论计算模型。", input_tokens=80, output_tokens=20),
+    ]
+    agent = QueryAgent(provider=provider, store=store, search=search,
+                       gap_score_threshold=0.01)
+    with patch.object(agent._search, "bm25_search", return_value=_fake_results(slugs, score=5.0)):
+        result = await agent.query("图灵机是什么？")
+    # CJK input → key-term extraction skipped → signals 3–5 disabled.
+    # Signals 1 (5 pages ≥ 3) and 2 (score 5.0 ≥ 0.01) both pass → no gap.
+    assert result.knowledge_gap is False
