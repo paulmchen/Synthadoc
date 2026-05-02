@@ -159,6 +159,7 @@ class QueryAgent:
         # they reflect vocabulary mismatch, not missing content.
         _MIN_TERM_FREQ = 2
         _any_term_missing = False   # signal 4 default
+        _defining_term_absent = False  # signal 5 default
         if _key_terms and candidates:
             # Count how many candidates contain each key term (doc frequency).
             _term_doc_freq = {
@@ -215,22 +216,46 @@ class QueryAgent:
                 if (p := self._store.read_page(r.slug)) and
                    any(p.content.lower().count(t) >= _MIN_TERM_FREQ for t in _specific)
             )
+
+            # Signal 5: discriminating term (rarest non-generic specific term) appears
+            # with meaningful frequency (≥ MIN_TERM_FREQ) in fewer than 2 candidates.
+            # Catches the "quantum error correction" case: "quantum" has freq=1 (an
+            # index mention) so signal 4 doesn't fire (no zero-freq terms), while
+            # "error"/"correction" incidentally give on_topic_pages=2 so signal 3
+            # also doesn't fire.  But "quantum" itself never appears ≥ 2 times in
+            # any page, definitively showing the defining concept is absent.
+            _discriminating_term_pages = (
+                sum(
+                    1 for r in candidates
+                    if (p := self._store.read_page(r.slug)) and
+                       p.content.lower().count(_discriminating_term) >= _MIN_TERM_FREQ
+                )
+                if _discriminating_term else 0
+            )
+            _defining_term_absent = (
+                bool(_specific)
+                and len(_term_doc_freq) >= 2
+                and _discriminating_term_pages < 2
+            )
         else:
             _discriminating_term = ""
             _pages_with_overlap = len(candidates)   # no key terms → skip check
+            _discriminating_term_pages = len(candidates)
 
         _gap = self._gap_score_threshold > 0 and (
             len(candidates) < 3                          # signal 1: too few pages
             or _max_score < self._gap_score_threshold    # signal 2: low BM25 scores
             or _pages_with_overlap < 2                   # signal 3: no dedicated coverage
             or _any_term_missing                         # signal 4: defining concept absent
+            or _defining_term_absent                     # signal 5: defining term barely present
         )
 
         # Always log retrieval quality so operators can tune gap_score_threshold.
         logger.info(
             "query retrieval — pages=%d, max_score=%.2f, "
-            "discriminating_term=%r, on_topic_pages=%d, gap=%s",
-            len(candidates), _max_score, _discriminating_term, _pages_with_overlap, _gap,
+            "discriminating_term=%r, on_topic_pages=%d, discriminating_pages=%d, gap=%s",
+            len(candidates), _max_score, _discriminating_term,
+            _pages_with_overlap, _discriminating_term_pages, _gap,
         )
         if _gap:
             _suggested = await SearchDecomposeAgent(self._provider).decompose(question)

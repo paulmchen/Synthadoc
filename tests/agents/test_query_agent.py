@@ -944,3 +944,75 @@ async def test_no_gap_multi_aspect_query_with_generic_corpus_term(tmp_wiki):
     # 4 pages mention "partial" ≥ 2 times → on_topic_pages = 4 ≥ 2 → no gap.
     assert result.knowledge_gap is False
     assert result.suggested_searches == []
+
+
+@pytest.mark.asyncio
+async def test_gap_signal5_defining_term_barely_present(tmp_wiki):
+    """Signal 5: gap triggers when the discriminating (rarest specific) term appears
+    with meaningful frequency (≥ 2 times) in zero candidate pages, even though other
+    key terms appear incidentally in 2+ pages (so signal 3 passes).
+
+    Real-world case: "quantum error correction" in a history-of-computing wiki.
+    "quantum" appears once in the index page (freq=1, so signal 4 doesn't fire) while
+    "error" and "correction" appear in Bombe/AI pages incidentally (on_topic_pages=2).
+    Signal 5 catches this: "quantum" never appears ≥ 2 times in any page.
+
+    bm25_search is mocked so BM25 IDF behaviour does not affect this test.
+    """
+    store = WikiStorage(tmp_wiki / "wiki")
+
+    # 2 pages where "error" and "correction" appear ≥ 2 times (incidental matches).
+    for i in range(2):
+        store.write_page(f"bombe-page-{i}", WikiPage(
+            title=f"The Bombe Machine {i}", tags=["history"],
+            content=(
+                "The Bombe detected incorrect Enigma settings by finding contradictions. "
+                "Each error in the assumed settings triggered a correction cycle. "
+                "The machine applied error correction logic to narrow down Enigma keys. "
+                "Finding an error led to rejecting that key and applying a correction."
+            ),
+            status="active", confidence="high", sources=[],
+        ))
+    # 6 pages with no "error"/"correction" but also no "quantum".
+    for i in range(6):
+        store.write_page(f"other-page-{i}", WikiPage(
+            title=f"Computing History {i}", tags=["history"],
+            content=(
+                "Alan Turing proposed the Turing machine as a theoretical model of computation. "
+                "John von Neumann designed the stored-program architecture."
+            ),
+            status="active", confidence="high", sources=[],
+        ))
+    # Index page that mentions "quantum" exactly once (passing mention, not coverage).
+    store.write_page("index", WikiPage(
+        title="Index", tags=["index"],
+        content=(
+            "Topics: transistors, microchips, bombe, artificial intelligence, quantum (not yet covered)."
+        ),
+        status="active", confidence="high", sources=[],
+    ))
+
+    all_slugs = (
+        [f"bombe-page-{i}" for i in range(2)]
+        + [f"other-page-{i}" for i in range(6)]
+    )
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.side_effect = [
+        CompletionResponse(text='["What is quantum error correction?"]',
+                           input_tokens=5, output_tokens=5),
+        # SearchDecomposeAgent call for suggestions (gap triggered):
+        CompletionResponse(text='["quantum error correction explained", "qubit error rates"]',
+                           input_tokens=8, output_tokens=8),
+        CompletionResponse(text="No quantum info found.", input_tokens=80, output_tokens=15),
+    ]
+    agent = QueryAgent(provider=provider, store=store, search=search,
+                       gap_score_threshold=0.01)  # signal 2 disabled
+    with patch.object(agent._search, "bm25_search", return_value=_fake_results(all_slugs)):
+        result = await agent.query("What is quantum error correction?")
+    # "quantum" is the discriminating term. It appears in the index page once but is
+    # NOT in the 8 mocked candidates (all_slugs excludes "index"). So discriminating
+    # pages = 0 < 2 → signal 5 fires → gap=True.
+    # Signal 3 would NOT fire alone: "error"/"correction" appear ≥ 2 times in 2 pages.
+    assert result.knowledge_gap is True
+    assert len(result.suggested_searches) >= 1
