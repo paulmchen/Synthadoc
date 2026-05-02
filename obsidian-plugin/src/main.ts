@@ -194,7 +194,7 @@ class IngestAllModal extends Modal {
         jobsLink.style.cssText = "display:none;font-size:12px;cursor:pointer;color:var(--link-color)";
         jobsLink.onclick = () => {
             this.close();
-            setTimeout(() => (this.app as any).commands?.executeCommandById("synthadoc-jobs"), 150);
+            setTimeout(() => (this.app as any).commands?.executeCommandById("synthadoc:synthadoc-jobs"), 150);
         };
 
         const setStatus = (html: string) => { statusEl.innerHTML = html; };
