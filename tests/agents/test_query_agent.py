@@ -1026,6 +1026,63 @@ async def test_gap_signal5_defining_term_barely_present(tmp_wiki):
     assert len(result.suggested_searches) >= 1
 
 
+# ── CJK (Chinese / Japanese / Korean) coverage ───────────────────────────────
+
+@pytest.mark.asyncio
+async def test_query_cjk_decompose_returns_cjk_subquestions(tmp_wiki):
+    """decompose() with a CJK question returns CJK sub-question strings without encoding loss."""
+    store = WikiStorage(tmp_wiki / "wiki")
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.return_value = CompletionResponse(
+        text='["图灵机的工作原理是什么？", "图灵机与现代计算机的关系"]',
+        input_tokens=10, output_tokens=10,
+    )
+    agent = QueryAgent(provider=provider, store=store, search=search)
+    sub_qs = await agent.decompose("图灵机是什么以及它如何影响现代计算机？")
+
+    assert len(sub_qs) == 2
+    assert "图灵机的工作原理是什么？" in sub_qs
+    assert "图灵机与现代计算机的关系" in sub_qs
+
+
+@pytest.mark.asyncio
+async def test_query_cjk_pages_answered_without_gap(tmp_wiki):
+    """CJK wiki pages + CJK question → citations include CJK slugs, no false knowledge gap.
+
+    Verifies that:
+    - CJK page content is included in the synthesis prompt (LLM sees Chinese text)
+    - knowledge_gap=False when ≥ 3 pages are retrieved with a high BM25 score
+    - citations include the CJK page slugs
+    """
+    store = WikiStorage(tmp_wiki / "wiki")
+    for i in range(4):
+        store.write_page(f"图灵机-{i}", WikiPage(
+            title=f"图灵机 {i}", tags=["计算理论"],
+            content="图灵机是一种理论计算模型，由艾伦·图灵于1936年提出。" * 5,
+            status="active", confidence="high", sources=[],
+        ))
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.side_effect = [
+        CompletionResponse(text='["图灵机是什么？"]', input_tokens=5, output_tokens=5),
+        CompletionResponse(text="图灵机是一种理论计算模型。", input_tokens=80, output_tokens=20),
+    ]
+    agent = QueryAgent(provider=provider, store=store, search=search,
+                       gap_score_threshold=0.01)
+    cjk_slugs = [f"图灵机-{i}" for i in range(4)]
+    with patch.object(agent._search, "bm25_search", return_value=_fake_results(cjk_slugs, score=5.0)):
+        result = await agent.query("图灵机是什么？")
+
+    assert result.knowledge_gap is False
+    assert result.answer == "图灵机是一种理论计算模型。"
+    assert any("图灵机" in c for c in result.citations)
+    # Verify CJK page content reached the synthesis prompt
+    synthesis_call = provider.complete.call_args_list[1]
+    prompt_text = synthesis_call[1]["messages"][0].content
+    assert "图灵机" in prompt_text
+
+
 @pytest.mark.asyncio
 async def test_cjk_query_no_false_gap(tmp_wiki):
     """CJK queries must not trigger spurious knowledge gaps from signals 3–5.
