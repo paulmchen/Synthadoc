@@ -224,10 +224,22 @@ class QueryAgent:
             if (p := self._store.read_page(r.slug))
         ) or "No relevant pages found."
 
+        if _gap:
+            synthesis_prompt = (
+                f"The wiki does not yet have a page on this topic. "
+                f"Answer the question using your general knowledge, then note in one sentence "
+                f"that the wiki does not currently cover this topic and suggest the user enriches it.\n\n"
+                f"Question: {question}\n\n"
+                f"Wiki pages available (unrelated to this question):\n{context}"
+            )
+        else:
+            synthesis_prompt = (
+                f"Answer using ONLY these wiki pages. Cite with [[PageTitle]].\n\n"
+                f"Question: {question}\n\nPages:\n{context}"
+            )
+
         resp2 = await self._provider.complete(
-            messages=[Message(role="user",
-                content=f"Answer using ONLY these wiki pages. Cite with [[PageTitle]].\n\n"
-                        f"Question: {question}\n\nPages:\n{context}")],
+            messages=[Message(role="user", content=synthesis_prompt)],
             temperature=0.0,
         )
         logger.info("query answered — %d page(s) cited, %d tokens",
