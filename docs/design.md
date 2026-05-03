@@ -1142,17 +1142,19 @@ The HTTP server always passes `auto_confirm=True` (no interactive terminal avail
 
 ```
 pending → in_progress → completed
-                      → failed    (non-retryable error; permanent, no retry)
-                      → pending   (retryable error; retries < max_retries, after backoff)
-                      → dead      (retryable error; retries == max_retries)
-                      → skipped   (deliberately not retried; e.g. auto-blocked domain)
+                      → failed     (non-retryable error; permanent, no retry)
+                      → pending    (retryable error; retries < max_retries, after backoff)
+                      → dead       (retryable error; retries == max_retries)
+                      → skipped    (system-initiated skip; e.g. auto-blocked domain)
+pending → cancelled   (user-initiated cancel via `synthadoc jobs cancel`)
 ```
 
 | Status | Meaning | Action |
 |--------|---------|--------|
 | `failed` | Non-retryable error (e.g. stub skill, bad source) | Inspect error; fix source; enqueue again |
 | `dead` | Retryable error exhausted max retries | `synthadoc jobs retry <id>` to reset to pending |
-| `skipped` | Permanently skipped without retry (e.g. domain auto-blocked after 403) | No action needed; remove from blocked list to re-enable |
+| `skipped` | System-initiated permanent skip (e.g. domain auto-blocked after repeated 403s) | No action needed; remove domain from blocked list to re-enable |
+| `cancelled` | Pending job cancelled by user via `synthadoc jobs cancel` | Re-enqueue manually if cancelled in error |
 
 **Backoff formula:** `backoff_base_seconds × 2^(retry_count) × jitter`  
 where `jitter ∈ [0.8, 1.2]` (±20% random). Applied only to retryable errors (LLM API timeouts, 5xx responses).
@@ -1445,3 +1447,4 @@ echo "Event $event fired on wiki $wiki" | mail -s "Synthadoc notification" you@e
 - **CJK multilingual query support** — Chinese, Japanese, and Korean queries no longer trigger false knowledge-gap reports. `QueryAgent._key_terms` now detects CJK character ranges and skips whitespace-based tokenization (which produces whole-sentence tokens with doc_freq=0), leaving signals 1 and 2 (page count and BM25 score) active for language-agnostic coverage assessment.
 - **ImageSkill standalone refactor** — `ImageSkill` now accepts `provider=` and performs the vision LLM call itself, returning populated text and token counts in `ExtractedContent`. `IngestAgent` injects its provider via `skill_kwargs` (same pattern as `YoutubeSkill`) and no longer contains a special `is_image` branch. The skill is now usable independently of the Synthadoc pipeline.
 - **YouTube executive summary** — each ingested YouTube video page opens with an LLM-generated executive summary (what the video is about, main topics, key takeaway) followed by the full timestamped transcript. Summary is generated once and cached; CJK transcripts receive a higher word-limit for the summary. YouTube Shorts are fully supported alongside standard-length videos.
+- **Obsidian UX improvements** — all modals are draggable and support full text selection and copy-paste; `Lint: run...` consolidates lint and auto-resolve into a single modal with an auto-resolve checkbox; `Jobs: retry failed or dead jobs...` shows a multi-select table with all checkboxes pre-ticked and polls progress live; `Synthadoc: Audit: events...` command added (table of system events with configurable limit); `Ingest: from URL...`, `Ingest: current file`, and `Wiki: regenerate scaffold...` modals all poll job status live.

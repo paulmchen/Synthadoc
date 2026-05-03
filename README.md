@@ -35,7 +35,7 @@
 
 > Built for individuals, small teams, and large organizations who need a knowledge base that stays accurate as documents accumulate.
 
-Synthadoc reads your raw source documents — PDFs, spreadsheets, PPTs, web pages, images, Word files, TXTs — and uses an LLM to synthesize them into a persistent, structured wiki. Cross-references are built automatically, contradictions are detected and surfaced, orphan pages are flagged, and every answer cites its sources. Outputs are stored as local Markdown files, ensuring seamless integration and autonomous management within [Obsidian](https://obsidian.md) or any wiki-compliant ecosystem.
+Synthadoc reads your raw source documents — PDFs, spreadsheets, PPTs, web pages, images, videos, Word files, TXTs — and uses an LLM to synthesize them into a persistent, structured wiki. Cross-references are built automatically, contradictions are detected and surfaced, orphan pages are flagged, and every answer cites its sources. Outputs are stored as local Markdown files, ensuring seamless integration and autonomous management within [Obsidian](https://obsidian.md) or any wiki-compliant ecosystem.
 
 ---
 
@@ -181,10 +181,10 @@ See [docs/design.md — Appendix A: Release Feature Index](docs/design.md#append
 | Python         | 3.11+   |                                     |
 | Node.js        | 18+     | Obsidian plugin build only          |
 | Git            | any     |                                     |
-| LLM API key    | —      | At least one required (see below)   |
+| LLM API key    | —      | At least one required — unless using Claude Code or Opencode (see below) |
 | Tavily API key | —      | Optional — web search feature only |
 
-**LLM API key — at least one required:**
+**LLM API key — at least one required** (unless using Claude Code or Opencode — see the last two rows below):
 
 
 | Provider         | Free tier                                     | Vision          | Get key                                                       |
@@ -239,7 +239,7 @@ npm test         # runs Vitest unit tests
 
 ### Step 4 — Set your API keys
 
-**At least one LLM API key is required** — Synthadoc will not start without one.
+**At least one LLM API key is required** — unless you use Claude Code or Opencode as your provider, in which case no separate API key is needed (see [Coding tool CLI providers](docs/design.md#provider-switching)).
 
 Synthadoc defaults to **Gemini Flash** as the LLM provider — it's free, requires no
 credit card, and offers 1 million tokens per day. Get a key at
@@ -287,7 +287,7 @@ synthadoc --version
 
 A **wiki** is a self-contained, structured knowledge base — a folder of Markdown pages linked by topic, maintained and cross-referenced automatically by Synthadoc. Think of it as a living document that grows smarter with every source you feed it: each ingest pass adds new pages, updates existing ones, and flags contradictions. For your own work, you can build and grow a domain-specific wiki — whether that's market research, a technical knowledge base, or a team handbook — and query it in plain English or other languages at any time.
 
-A wiki must be installed before the engine can serve it. The fastest way to get started is the **History of Computing** demo, which ships with 10 pre-built pages and sample source files — no LLM API key required to browse it.
+A wiki must be installed before the engine can serve it. The fastest way to get started is the **History of Computing** demo, which ships with 13 pre-built pages and sample source files — no LLM API key required to browse it.
 
 **Install the demo wiki:**
 
@@ -342,9 +342,10 @@ The guide covers:
 7. Resolve a contradiction
 8. Fix an orphan page
 9. Web search ingestion with automatic decomposition
-10. Enrich the wiki with scaffold (regenerate/update index, purpose, AGENTS.md)
-11. Audit features (token cost, history, events)
-12. Schedule recurring operations
+10. Ingest a YouTube video
+11. Enrich the wiki with scaffold (regenerate/update index, purpose, AGENTS.md)
+12. Audit features (token cost, history, events)
+13. Schedule recurring operations
 
 ---
 
