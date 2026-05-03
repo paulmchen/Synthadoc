@@ -864,6 +864,8 @@ All commands are accessible via the Command Palette (`Ctrl/Cmd+P` → type `Synt
 | `Synthadoc: Audit: query history...`  | Recent questions, sub-question counts, token usage, cost per query.                                |
 | `Synthadoc: Audit: events...`         | Table of system events — contradictions found, auto-resolutions, cost gate triggers. Customisable limit (default 100, max 1000). |
 
+![Audit Events modal showing domain_auto_blocked entries with timestamp, job ID, event type, and metadata columns](png/synthadoc-audit-events.png)
+
 > **UX note:** All modals are draggable and support full text selection and copy-paste.
 
 ### Ribbon icon
