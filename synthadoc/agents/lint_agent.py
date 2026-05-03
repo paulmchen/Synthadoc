@@ -6,7 +6,7 @@ import re
 from dataclasses import dataclass, field
 
 from synthadoc.providers.base import LLMProvider, Message
-from synthadoc.storage.log import LogWriter
+from synthadoc.storage.log import AuditDB, LogWriter
 from synthadoc.storage.wiki import WikiStorage
 
 
@@ -58,11 +58,13 @@ def find_orphan_slugs(
 
 class LintAgent:
     def __init__(self, provider: LLMProvider, store: WikiStorage,
-                 log_writer: LogWriter, confidence_threshold: float = 0.85) -> None:
+                 log_writer: LogWriter, confidence_threshold: float = 0.85,
+                 audit_db: AuditDB | None = None) -> None:
         self._provider = provider
         self._store = store
         self._log = log_writer
         self._threshold = confidence_threshold
+        self._audit = audit_db
 
     def _find_orphans(self, slugs: list[str]) -> list[str]:
         page_texts = {}
@@ -71,7 +73,8 @@ class LintAgent:
             page_texts[slug] = page.content if page else ""
         return find_orphan_slugs(page_texts)
 
-    async def lint(self, scope: str = "all", auto_resolve: bool = False) -> LintReport:
+    async def lint(self, scope: str = "all", auto_resolve: bool = False,
+                   job_id: str = "system") -> LintReport:
         report = LintReport()
         slugs = self._store.list_pages()
 
@@ -82,6 +85,9 @@ class LintAgent:
                 page = self._store.read_page(slug)
                 if page and page.status == "contradicted":
                     report.contradictions_found += 1
+                    if self._audit:
+                        await self._audit.record_audit_event(
+                            job_id, "contradiction_found", {"slug": slug})
                     if auto_resolve:
                         resp = await self._provider.complete(
                             messages=[Message(role="user",
@@ -93,6 +99,9 @@ class LintAgent:
                         page.content += f"\n\n**Resolution:** {resp.text}"
                         self._store.write_page(slug, page)
                         report.contradictions_resolved += 1
+                        if self._audit:
+                            await self._audit.record_audit_event(
+                                job_id, "auto_resolved", {"slug": slug})
 
         if scope in ("all", "orphans"):
             report.orphan_slugs = self._find_orphans(slugs)

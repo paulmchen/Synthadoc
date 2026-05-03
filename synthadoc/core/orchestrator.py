@@ -351,7 +351,8 @@ class Orchestrator:
                 provider=make_provider("lint", self._cfg),
                 store=self._store, log_writer=self._log,
                 confidence_threshold=self._cfg.cost.auto_resolve_confidence_threshold,
-            ).lint(scope=scope, auto_resolve=auto_resolve)
+                audit_db=self._audit,
+            ).lint(scope=scope, auto_resolve=auto_resolve, job_id=job_id)
             await self._queue.complete(job_id)
             self._hooks.fire("on_lint_complete", {
                 "event": "on_lint_complete", "wiki": str(self._root),
