@@ -320,6 +320,9 @@ The six source files in `raw_sources/` are designed to demonstrate every ingest 
 | `quantum-computing-primer.png`     | `image`    | **A — New page**: vision LLM extracts key concepts; creates `quantum-computing`                                                                                         |
 | `konrad-zuse-z3-computer.md`       | `markdown` | **C — Orphan**: specific niche topic; creates `konrad-zuse` with no inbound links                                                                                       |
 
+> **YouTube videos** are ingested by URL rather than file and are not part of this batch.
+> See [Step 10 — Ingest a YouTube video](#step-10--ingest-a-youtube-video) for the full walkthrough.
+
 ### Run batch ingest
 
 **CLI:**
