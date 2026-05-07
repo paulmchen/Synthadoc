@@ -174,7 +174,7 @@ class ScaffoldRequest(BaseModel):
 
 class ContextBuildRequest(BaseModel):
     goal: str
-    token_budget: Optional[int] = None   # falls back to cfg.query.context_token_budget
+    token_budget: int | None = None   # falls back to cfg.query.context_token_budget
 
 
 class AnalyseRequest(BaseModel):
