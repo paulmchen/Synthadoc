@@ -1419,6 +1419,8 @@ Measured on Windows 11, Python 3.14, pytest-benchmark 5.2.3 (`time.perf_counter`
 Synthetic wiki with 10 branches; scoped tests search 2 branches (~20% of corpus).
 Each result is the median of 5 rounds.
 
+> **What these numbers measure:** The BM25 corpus is built from disk on the first query and then cached in memory for the lifetime of the server process. The reported medians reflect **warm-cache latency** — rounds 2–5 of each benchmark run, where all page content is already in memory. Cold-start latency (the very first query after server start, or immediately after a page write that invalidates the cache) will be higher, proportional to page count and local disk speed. On a running server handling real traffic, warm-cache numbers are representative of typical query latency.
+
 ### Scoped search (2 of 10 branches)
 
 | Pages | Median | Min   | Max   |
