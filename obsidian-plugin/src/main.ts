@@ -1161,9 +1161,14 @@ class WebSearchModal extends Modal {
                             if (!errors.includes(msg)) errors.push(msg);
                         }
                     }
-                    // Always show ingesting progress once child jobs are known
+                    // Show progress; when parent is done clarify that work is still ongoing
                     if (childSettled < childJobIds.length) {
-                        statusEl.setText(`Ingesting ${childJobIds.length} URL${childJobIds.length !== 1 ? "s" : ""}… (${childSettled} done)`);
+                        const remaining = childJobIds.length - childSettled;
+                        if (isDone) {
+                            statusEl.setText(`Wrapping up — ${remaining} ingest${remaining !== 1 ? "s" : ""} still running…`);
+                        } else {
+                            statusEl.setText(`Ingesting ${childJobIds.length} URL${childJobIds.length !== 1 ? "s" : ""}… (${childSettled} done)`);
+                        }
                     }
                 }
 
