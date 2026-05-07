@@ -1026,6 +1026,62 @@ async def test_gap_signal5_defining_term_barely_present(tmp_wiki):
     assert len(result.suggested_searches) >= 1
 
 
+# ── Relational-verb stopwords ─────────────────────────────────────────────────
+
+@pytest.mark.asyncio
+async def test_gap_relational_verb_in_query_does_not_trigger_false_gap(tmp_wiki):
+    """Relational verbs like 'shape' in a query must not trigger a false gap when
+    the wiki has relevant content.
+
+    'How did Moore's Law shape hardware design?' — 'shape' is a relational verb,
+    not a content noun. Wiki pages use "shaped" at most once in passing; they never
+    repeat 'shape' ≥ 2 times as a dedicated concept. With the old code, 'shape'
+    enters _key_terms (doc_freq > 0 via "shaped"), gets qualifying_pages=0 (never
+    appears ≥ 2 times in any page), sets min_qualifying=0, and fires signal 5 →
+    false gap.
+
+    After adding 'shape' to _STOPWORDS it is excluded from key_terms and signal 5
+    only evaluates genuine topic words (moore', hardware, design, software) — all of
+    which appear ≥ 2 times in the pages → min_qualifying > 0 → no gap.
+    """
+    store = WikiStorage(tmp_wiki / "wiki")
+    # Each page mentions "shaped" exactly once (doc_freq("shape") > 0, but count < 2)
+    # and repeats all genuine topic words multiple times.
+    moores_content = (
+        "Moore's Law predicts that transistor density doubles every two years. "
+        "Moore's Law proved accurate for decades and shaped the computing industry. "
+        "Hardware engineers designed chips with hardware performance in mind. "
+        "Hardware improvements drove hardware design decisions for every generation. "
+        "Software developers could write more complex software knowing hardware "
+        "would keep up. Software complexity grew alongside Moore's Law improvements."
+    )
+    for i in range(5):
+        store.write_page(f"moores-law-{i}", WikiPage(
+            title=f"Moore's Law {i}", tags=["hardware"],
+            content=moores_content,
+            status="active", confidence="high", sources=[],
+        ))
+
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.return_value = CompletionResponse(
+        text='["What is Moore\'s Law?", "How did Moore\'s Law influence hardware design?"]',
+        input_tokens=10, output_tokens=5,
+    )
+
+    agent = QueryAgent(provider=provider, store=store, search=search,
+                       gap_score_threshold=0.01)
+    with patch.object(agent._search, "bm25_search",
+                      return_value=_fake_results([f"moores-law-{i}" for i in range(5)], score=9.0)):
+        result = await agent.query(
+            "How did Moore's Law shape both hardware design and software expectations over time?"
+        )
+
+    # 'shape' is in _STOPWORDS → excluded from key_terms → signal 5 does not fire.
+    # Remaining terms (moore', hardware, design, software) all have qualifying_pages > 0.
+    assert result.knowledge_gap is False
+
+
 # ── CJK (Chinese / Japanese / Korean) coverage ───────────────────────────────
 
 @pytest.mark.asyncio
