@@ -268,6 +268,22 @@ class IngestAgent:
         )
         (wiki_dir / "overview.md").write_text(content, encoding="utf-8", newline="\n")
 
+    def _staging_policy(self) -> str:
+        return self._cfg.ingest.staging_policy if self._cfg else "off"
+
+    def _write_or_stage(self, slug: str, page: "WikiPage", policy: str) -> bool:
+        """Write page directly to wiki/ or to candidates/ when policy requires it.
+        Returns True if staged, False if written directly."""
+        if policy == "all" and self._wiki_root:
+            from synthadoc.storage.wiki import WikiStorage as _WS
+            cand_dir = self._wiki_root / "wiki" / "candidates"
+            cand_dir.mkdir(exist_ok=True)
+            _WS(cand_dir).write_page(slug, page)
+            return True
+        self._store.write_page(slug, page)
+        self._search.invalidate_index()
+        return False
+
     def _load_purpose(self) -> str:
         """Load wiki/purpose.md for scope filtering. Returns '' if absent."""
         if self._wiki_root is None:
@@ -499,13 +515,17 @@ class IngestAgent:
             result.pages_flagged.append(target)
 
         elif action == "update" and target and self._store.page_exists(target):
+            policy = self._staging_policy()
             with self._store.page_lock(target):
                 page = self._store.read_page(target)
                 if page:
                     section = update_content or f"## From {p.name}\n\n{text[:1000]}"
                     page.content = page.content.rstrip() + f"\n\n{section}"
-                    self._store.write_page(target, page)
-                    self._search.invalidate_index()
+                    staged = self._write_or_stage(target, page, policy)
+            if staged:
+                logger.info("ingest: staged update to candidates slug=%s source=%s", target, source[:80])
+            else:
+                logger.info("ingest: updated page slug=%s source=%s", target, source[:80])
             result.pages_updated.append(target)
 
         else:  # "create" or fallback
@@ -528,6 +548,8 @@ class IngestAgent:
 
                 if self._store.page_exists(slug):
                     # Slug already exists — never overwrite; append as update instead
+                    policy = self._staging_policy()
+                    staged = False
                     with self._store.page_lock(slug):
                         page = self._store.read_page(slug)
                         if page:
@@ -536,9 +558,11 @@ class IngestAgent:
                             else:
                                 section = f"## From {p.name}\n\n{text[:1500]}"
                             page.content = page.content.rstrip() + f"\n\n{section}"
-                            self._store.write_page(slug, page)
-                            self._search.invalidate_index()
-                    logger.info("ingest: updated existing page slug=%s source=%s", slug, source[:80])
+                            staged = self._write_or_stage(slug, page, policy)
+                    if staged:
+                        logger.info("ingest: staged update to candidates slug=%s source=%s", slug, source[:80])
+                    else:
+                        logger.info("ingest: updated existing page slug=%s source=%s", slug, source[:80])
                     result.pages_updated.append(slug)
                 else:
                     if extracted.metadata.get("has_summary"):
@@ -562,22 +586,21 @@ class IngestAgent:
                     )
 
                     # Staging fork: route to candidates/ based on policy
-                    policy = self._cfg.ingest.staging_policy if self._cfg else "off"
-                    go_to_candidates = False
-                    if policy == "all":
-                        go_to_candidates = True
-                    elif policy == "threshold":
-                        min_conf = self._cfg.ingest.staging_confidence_min
-                        go_to_candidates = not _confidence_passes_threshold(
-                            new_page.confidence, min_conf
+                    policy = self._staging_policy()
+                    go_to_candidates = (policy == "all") or (
+                        policy == "threshold"
+                        and self._cfg is not None
+                        and not _confidence_passes_threshold(
+                            new_page.confidence,
+                            self._cfg.ingest.staging_confidence_min,
                         )
+                    )
 
                     if go_to_candidates and self._wiki_root:
                         from synthadoc.storage.wiki import WikiStorage as _WS
                         cand_dir = self._wiki_root / "wiki" / "candidates"
                         cand_dir.mkdir(exist_ok=True)
-                        cand_store = _WS(cand_dir)
-                        cand_store.write_page(slug, new_page)
+                        _WS(cand_dir).write_page(slug, new_page)
                         logger.info("ingest: staged to candidates slug=%s source=%s", slug, source[:80])
                         result.pages_created.append(slug)
                     else:
