@@ -1562,9 +1562,14 @@ Response: `ContextPack.to_dict()` — keys `goal`, `token_budget`, `tokens_used`
 ### CLI command
 
 ```bash
+# Print to terminal — inspect, copy, or pipe into another tool
+synthadoc context build "early computing pioneers"
+
+# Custom token budget (default 4000)
 synthadoc context build "early computing pioneers" --tokens 2000
-synthadoc context build "..." --output context.md
-synthadoc context build "..." --save   # saves to wiki/context/<slug>.md
+
+# Save to a file — feed to an external LLM prompt or store next to a document you're writing
+synthadoc context build "early computing pioneers" --output briefing.md
 ```
 
 ---
@@ -1636,4 +1641,4 @@ synthadoc context build "..." --save   # saves to wiki/context/<slug>.md
 - **Candidates staging** — new pages can be routed to `wiki/candidates/` based on `[ingest] staging_policy` (`off` / `all` / `threshold`); `threshold` mode compares page confidence against `staging_confidence_min`; candidates are excluded from BM25, lint, and contradiction detection until promoted
 - **Candidates CLI** — `synthadoc staging policy` shows/sets the staging policy; `synthadoc candidates list / promote / discard` manage the candidate queue; policy changes take effect on next ingest without a server restart
 - **ContextAgent** — `ContextAgent.build(goal)` decomposes the goal, runs parallel BM25 searches, merges by best score per slug, and greedily packs pages within a configurable token budget; omissions are recorded; output is a `ContextPack` with `to_markdown()` and `to_dict()` renderers
-- **Context CLI + REST endpoint** — `synthadoc context build "..."` with `--tokens`, `--output`, `--save` flags; `POST /context/build` JSON endpoint; default token budget configurable via `[query] context_token_budget` (default 4000)
+- **Context CLI + REST endpoint** — `synthadoc context build "..."` with `--tokens` and `--output` flags; prints to terminal by default, saves to any file with `--output`; typical uses: paste into an external LLM prompt, save next to a document you are writing, or pipe into another CLI tool; `POST /context/build` JSON endpoint; default token budget configurable via `[query] context_token_budget` (default 4000)

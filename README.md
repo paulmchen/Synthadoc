@@ -706,20 +706,25 @@ synthadoc candidates discard --all --wiki-root ~/wikis/my-wiki
 
 ### Context packs
 
-A context pack decomposes a goal into sub-questions, runs parallel BM25 searches, and packs the highest-scoring excerpts into a Markdown document within a token budget. Useful as grounded context for an LLM prompt or as a research brief.
+A context pack decomposes a goal into sub-questions, runs parallel BM25 searches, and packs the highest-scoring excerpts into a single cited Markdown document within a token budget.
+
+**Typical use cases:**
+- Paste into an external LLM chat (Claude.ai, ChatGPT) as grounded context before asking a question
+- Save next to a document you are writing as a cited research brief
+- Pipe into another CLI tool that reads Markdown
 
 ```bash
-# Print context pack to terminal
+# Print to terminal — inspect, copy, or pipe
 synthadoc context build "How did transistors change computing?" -w my-wiki
+
+# Copy to clipboard and paste into an LLM chat (macOS)
+synthadoc context build "early computing pioneers" -w my-wiki | pbcopy
 
 # Custom token budget (default 4000)
 synthadoc context build "Early programming languages" --tokens 8000 -w my-wiki
 
-# Save to a file
-synthadoc context build "Rise of microprocessors" --output context.md -w my-wiki
-
-# Save as a wiki page in wiki/context/
-synthadoc context build "Von Neumann architecture" --save --wiki-root ~/wikis/my-wiki
+# Save next to a document you are writing
+synthadoc context build "Rise of microprocessors" --output ~/drafts/computing-brief.md -w my-wiki
 ```
 
 ### Removing a wiki

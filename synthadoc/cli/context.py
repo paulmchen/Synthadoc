@@ -2,7 +2,6 @@
 # Copyright (C) 2026 William Johnason / axoviq.com
 from __future__ import annotations
 
-import re
 from pathlib import Path
 from typing import Optional
 
@@ -52,7 +51,6 @@ def context_build(
     goal: str = typer.Argument(..., help="Goal or topic to build context for"),
     tokens: int = typer.Option(4000, "--tokens", help="Token budget"),
     output: Optional[str] = typer.Option(None, "--output", help="Save to file"),
-    save: bool = typer.Option(False, "--save", help="Save to wiki/context/"),
     wiki: Optional[str] = typer.Option(None, "--wiki", "-w"),
     wiki_root: Optional[str] = typer.Option(None, "--wiki-root"),
 ) -> None:
@@ -69,11 +67,5 @@ def context_build(
     if output:
         Path(output).write_text(markdown, encoding="utf-8")
         typer.echo(f"Context pack saved to {output}")
-    elif save and wiki_root_path:
-        slug = re.sub(r"[^\w]+", "-", goal.lower()).strip("-")[:50]
-        dest = wiki_root_path / "wiki" / "context" / f"{slug}.md"
-        dest.parent.mkdir(exist_ok=True)
-        dest.write_text(markdown, encoding="utf-8")
-        typer.echo(f"Context pack saved to {dest}")
     else:
         typer.echo(markdown)

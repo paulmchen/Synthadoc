@@ -1334,8 +1334,7 @@ synthadoc staging policy off
 
 ## Step 16 — Build a context pack
 
-A **context pack** is a token-bounded evidence bundle assembled from the wiki — useful for
-feeding targeted wiki knowledge into an LLM prompt, a writing session, or an AI assistant.
+A **context pack** is a token-bounded evidence bundle assembled from the wiki. It decomposes your goal into sub-questions, runs parallel BM25 searches across the wiki, and packs the highest-scoring excerpts into a single cited Markdown document within a token budget.
 
 ### Build a pack from the CLI
 
@@ -1347,24 +1346,55 @@ Output is Markdown printed to the terminal:
 
 ```markdown
 # Context Pack: early computing pioneers
-Generated: 2026-05-06T15:10:42
+Generated: 2026-05-07T09:14:22
 Token budget: 4000 | Used: 1823
 
 ---
 
 ## [[alan-turing]] — relevance: 3.42
-> Alan Turing developed the theoretical basis of modern computation...
+> Alan Turing developed the theoretical basis of modern computation through his 1936 paper
+> on computable numbers. He proposed the concept of a universal machine capable of simulating
+> any algorithm...
 Source: `wiki/alan-turing.md` | Confidence: high | Tags: mathematics, computation
 
 ## [[grace-hopper]] — relevance: 2.91
-> Grace Hopper pioneered compiler development and coined "debugging"...
+> Grace Hopper pioneered compiler development and coined the term debugging after finding
+> a moth in a relay. Her work on COBOL brought programming to business users...
 Source: `wiki/grace-hopper.md` | Confidence: high | Tags: programming, navy
+
+## [[ada-lovelace]] — relevance: 2.44
+> Ada Lovelace wrote what is considered the first algorithm intended for a mechanical
+> computer, the Analytical Engine designed by Charles Babbage...
+Source: `wiki/ada-lovelace.md` | Confidence: high | Tags: mathematics, history
+
+---
+
+## Omitted — token budget exceeded
+- [[charles-babbage]] — ~420 tokens
+- [[john-von-neumann]] — ~390 tokens
 ```
 
-### Save to a file
+Each entry is cited with its source page, confidence, and tags. Pages that did not fit within the budget are listed in the omitted section.
+
+### Use cases
+
+**Feed into an external LLM prompt** — paste the terminal output directly into Claude.ai, ChatGPT, or any other chat interface as grounded context before asking a question:
 
 ```bash
-synthadoc context build "early computing pioneers" --output context.md
+synthadoc context build "transistor history and Moore's Law" | pbcopy   # macOS — copies to clipboard
+```
+
+**Save next to a document you are writing** — keep the evidence bundle alongside your draft:
+
+```bash
+synthadoc context build "early computing pioneers" --output ~/drafts/computing-brief.md
+```
+
+**Pipe into another CLI tool** — chain with any tool that reads from stdin:
+
+```bash
+synthadoc context build "Von Neumann architecture" --output /tmp/ctx.md
+llm -f /tmp/ctx.md "write a 500-word article based on this"
 ```
 
 ### Adjust the token budget
@@ -1379,14 +1409,6 @@ Set a permanent default in `config.toml`:
 [query]
 context_token_budget = 6000
 ```
-
-### Save directly to the wiki
-
-```bash
-synthadoc context build "early computing pioneers" --save
-```
-
-Writes to `wiki/context/early-computing-pioneers.md` — queryable like any other wiki page.
 
 ---
 
