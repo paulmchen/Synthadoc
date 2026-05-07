@@ -1130,6 +1130,51 @@ async def test_gap_influence_verb_in_query_does_not_trigger_false_gap(tmp_wiki):
 
 
 @pytest.mark.asyncio
+async def test_gap_hyphen_normalisation_open_source_two_word_content(tmp_wiki):
+    """Query uses 'open-source' (hyphenated) but wiki pages write 'open source'
+    (two words).  Without hyphen normalisation, count('open-source') in content
+    that only contains 'open source' returns 0 → on_topic_pages=0 → signal 3 gap.
+
+    With hyphen normalisation (hyphens → spaces in both key terms and content),
+    the key term becomes 'open source' and matches wiki content correctly.
+    """
+    store = WikiStorage(tmp_wiki / "wiki")
+    # Pages use "open source" (two words), NOT "open-source" (hyphenated).
+    two_word_content = (
+        "Unix was a foundational influence on the open source movement in computing. "
+        "The open source movement grew from Unix philosophy and the GNU project. "
+        "Open source software licensing models trace their roots to Unix sharing. "
+        "The open source community adopted Unix tools as core infrastructure. "
+        "Unix principles shaped open source development practices for decades."
+    )
+    for i in range(5):
+        store.write_page(f"unix-2w-{i}", WikiPage(
+            title=f"Unix Open Source {i}", tags=["unix"],
+            content=two_word_content,
+            status="active", confidence="high", sources=[],
+        ))
+
+    search = HybridSearch(store, tmp_wiki / ".synthadoc" / "embeddings.db")
+    provider = AsyncMock()
+    provider.complete.return_value = CompletionResponse(
+        text='["What is the open-source movement?", "How did Unix relate to it?"]',
+        input_tokens=10, output_tokens=5,
+    )
+
+    agent = QueryAgent(provider=provider, store=store, search=search,
+                       gap_score_threshold=0.01)
+    with patch.object(agent._search, "bm25_search",
+                      return_value=_fake_results([f"unix-2w-{i}" for i in range(5)], score=9.0)):
+        result = await agent.query(
+            "How did Unix influence the open-source movement?"
+        )
+
+    # key term 'open source' (normalised from 'open-source') matches 'open source'
+    # in page content (≥ 5 occurrences per page) → on_topic_pages=5 → no gap.
+    assert result.knowledge_gap is False
+
+
+@pytest.mark.asyncio
 async def test_gap_possessive_query_term_matches_bare_and_possessive_forms(tmp_wiki):
     """'Moore's' in a query must produce key term 'moore' (not 'moore\\'') so that
     pages referencing Moore in any form — 'Gordon Moore', 'Moore's Law', 'Moores' —

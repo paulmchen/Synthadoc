@@ -186,6 +186,9 @@ class QueryAgent:
         # useless as a discriminator.  Including "'" in the strip set is safe: it
         # handles possessives ("Moore's" → "moore") and plural-possessives
         # ("computers'" → "computer") without over-stripping ordinary words.
+        # Hyphens are normalised to spaces so that compound terms like "open-source"
+        # match wiki pages that write "open source" (and vice-versa).  The same
+        # normalisation is applied to page content during the overlap check.
         #
         # CJK scripts (Chinese, Japanese, Korean) do not use whitespace word
         # boundaries, so split() either yields the whole sentence as one token
@@ -200,9 +203,9 @@ class QueryAgent:
             for c in question
         )
         _key_terms = set() if _contains_cjk else {
-            w.lower().rstrip("s'?!.,")       # strip plural-s, possessive ', punctuation
+            w.lower().rstrip("s'?!.,").replace("-", " ")  # normalize compound terms
             for w in question.split()
-            if len(w) > 4 and w.lower().rstrip("s'?!.,") not in _STOPWORDS
+            if len(w) > 4 and w.lower().rstrip("s'?!.,").replace("-", " ") not in _STOPWORDS
         }
 
         # Signal 3: check whether retrieved pages contain dedicated coverage of the
@@ -225,10 +228,12 @@ class QueryAgent:
         _defining_term_absent = False  # signal 5 default
         if _key_terms and candidates:
             # Count how many candidates contain each key term (doc frequency).
+            # Content is hyphen-normalised to match both "open-source" and "open source".
             _term_doc_freq = {
                 t: sum(
                     1 for r in candidates
-                    if (p := self._store.read_page(r.slug)) and t in p.content.lower()
+                    if (p := self._store.read_page(r.slug))
+                    and t in p.content.lower().replace("-", " ")
                 )
                 for t in _key_terms
             }
@@ -263,7 +268,7 @@ class QueryAgent:
                 _p = self._store.read_page(_r.slug)
                 if not _p:
                     continue
-                _content = _p.content.lower()
+                _content = _p.content.lower().replace("-", " ")
                 _page_on_topic = False
                 for _t in _specific:
                     if _content.count(_t) >= _MIN_TERM_FREQ:
