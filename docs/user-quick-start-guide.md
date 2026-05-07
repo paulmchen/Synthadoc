@@ -1373,7 +1373,7 @@ synthadoc context build "early computing pioneers" --output context.md
 synthadoc context build "early computing pioneers" --tokens 2000
 ```
 
-Set a permanent default in `synthadoc.toml`:
+Set a permanent default in `config.toml`:
 
 ```toml
 [query]

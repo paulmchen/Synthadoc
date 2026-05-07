@@ -228,7 +228,7 @@ query decomposed into 2 sub-question(s): "Who invented FORTRAN?" | "What was the
 After the BM25 merge step, a knowledge gap is detected when ANY of three independent signals fire (gap is skipped when `gap_score_threshold = 0`):
 
 1. `len(candidates) < 3` — wiki has almost nothing on the topic
-2. `max_score < gap_score_threshold` (default: `2.0`, configurable via `[query] gap_score_threshold` in `synthadoc.toml`) — low keyword overlap
+2. `max_score < gap_score_threshold` (default: `2.0`, configurable via `[query] gap_score_threshold` in `config.toml`) — low keyword overlap
 3. Fewer than 2 candidates contain any key noun from the question with sufficient frequency — corpus-relative BM25 scores can be inflated by shared vocabulary; this content-overlap check catches off-topic matches
 
 When a gap fires:
@@ -1546,7 +1546,7 @@ Method: `await agent.build(goal, token_budget=None) → ContextPack`
 
 ### Default token budget
 
-The default token budget is configured via `[query] context_token_budget` in `synthadoc.toml` (default: 4000). The HTTP request body and CLI `--tokens` flag can override it per call.
+The default token budget is configured via `[query] context_token_budget` in `config.toml` (default: 4000). The HTTP request body and CLI `--tokens` flag can override it per call.
 
 ### REST API
 
