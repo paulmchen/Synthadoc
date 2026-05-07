@@ -11,6 +11,7 @@ from typing import Optional
 import typer
 import yaml
 
+from synthadoc.cli._utils import _resolve_root
 from synthadoc.cli.main import app
 
 staging_app = typer.Typer(name="staging", help="Manage staging policy for new wiki pages.")
@@ -21,6 +22,12 @@ app.add_typer(candidates_app)
 
 def _cfg_path(root: Path) -> Path:
     return root / ".synthadoc" / "config.toml"
+
+
+def _paths(wiki_root: Optional[str]) -> tuple[Path, Path, Path]:
+    """Return (root, cfg_file, cand_dir) from the --wiki-root option."""
+    root = _resolve_root(wiki_root)
+    return root, _cfg_path(root), root / "wiki" / "candidates"
 
 
 def _write_toml(raw: dict, path: Path) -> None:
@@ -43,8 +50,7 @@ def staging_policy_cmd(
     wiki_root: Optional[str] = typer.Option(None, "--wiki-root"),
 ) -> None:
     """Show or set the staging policy."""
-    root = Path(wiki_root) if wiki_root else Path(".")
-    cfg_file = _cfg_path(root)
+    root, cfg_file, _ = _paths(wiki_root)
     raw = tomllib.loads(cfg_file.read_text()) if cfg_file.exists() else {}
 
     if policy is None:
@@ -77,8 +83,7 @@ def candidates_list(
     wiki_root: Optional[str] = typer.Option(None, "--wiki-root"),
 ) -> None:
     """List all candidate pages awaiting review."""
-    root = Path(wiki_root) if wiki_root else Path(".")
-    cand_dir = root / "wiki" / "candidates"
+    _, _, cand_dir = _paths(wiki_root)
     pages = sorted(cand_dir.glob("*.md")) if cand_dir.exists() else []
     if not pages:
         typer.echo("No candidates.")
@@ -98,8 +103,7 @@ def candidates_promote(
     wiki_root: Optional[str] = typer.Option(None, "--wiki-root"),
 ) -> None:
     """Promote candidate(s) to the main wiki."""
-    root = Path(wiki_root) if wiki_root else Path(".")
-    cand_dir = root / "wiki" / "candidates"
+    root, _, cand_dir = _paths(wiki_root)
     wiki_dir = root / "wiki"
 
     targets = list(cand_dir.glob("*.md")) if all_ else []
@@ -125,8 +129,7 @@ def candidates_discard(
     wiki_root: Optional[str] = typer.Option(None, "--wiki-root"),
 ) -> None:
     """Discard candidate page(s)."""
-    root = Path(wiki_root) if wiki_root else Path(".")
-    cand_dir = root / "wiki" / "candidates"
+    _, _, cand_dir = _paths(wiki_root)
 
     targets = list(cand_dir.glob("*.md")) if all_ else []
     if not all_ and slug:

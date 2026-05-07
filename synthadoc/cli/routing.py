@@ -6,6 +6,7 @@ from typing import Optional
 
 import typer
 
+from synthadoc.cli._utils import _resolve_root
 from synthadoc.core.routing import RoutingIndex
 
 routing_app = typer.Typer(name="routing", help="Manage ROUTING.md — scoped query routing.")
@@ -16,7 +17,7 @@ _SLUG_RE = re.compile(r"-\s*\[\[([^\]]+)\]\]")
 
 def _paths(wiki_root: Optional[str]) -> tuple[Path, Path, Path]:
     """Return (root, routing_path, wiki_dir) from the --wiki-root option."""
-    root = Path(wiki_root) if wiki_root else Path(".")
+    root = _resolve_root(wiki_root)
     return root, root / "ROUTING.md", root / "wiki"
 
 
