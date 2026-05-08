@@ -169,7 +169,7 @@ class Orchestrator:
             else:
                 child_ids = []
 
-            await self._queue.complete(job_id, result={
+            job_result: dict = {
                 "pages_created": result.pages_created,
                 "pages_updated": result.pages_updated,
                 "pages_flagged": result.pages_flagged,
@@ -177,7 +177,10 @@ class Orchestrator:
                 "child_job_ids": child_ids,
                 "tokens_used": result.tokens_used,
                 "cost_usd": result.cost_usd,
-            })
+            }
+            if result.skip_reason:
+                job_result["skip_reason"] = result.skip_reason
+            await self._queue.complete(job_id, result=job_result)
             # Embed newly written pages for vector search
             if self._cfg.search.vector:
                 for slug in result.pages_created + result.pages_updated:
