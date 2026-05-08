@@ -356,8 +356,9 @@ class IngestAgent:
         # Provide safe defaults so the audit call at the end always succeeds.
         if not self._needs_file_check(source):
             p = Path(source.split("?")[0].rstrip("/").split("/")[-1] or "url-source")
-            src_hash = hashlib.sha256(source.encode()).hexdigest()
-            src_size = len(source.encode())
+            _canonical = _canonical_source(source)
+            src_hash = hashlib.sha256(_canonical.encode()).hexdigest()
+            src_size = len(_canonical.encode())
             if not force and await self._already_ingested(src_hash, src_size):
                 result.skipped = True
                 result.skip_reason = "already ingested"

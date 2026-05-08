@@ -583,12 +583,11 @@ The modal prepends `search for:` automatically — just type the topic, no prefi
 ## Step 10 — Ingest a YouTube video
 
 Pass any YouTube URL directly — the transcript is extracted automatically from the
-YouTube caption system (no API key, no audio download). Standard videos and **YouTube
-Shorts** (`https://www.youtube.com/shorts/...`) are both supported:
+YouTube caption system (no API key, no audio download). Both the full URL and the
+short-link form (`https://youtu.be/...`) are accepted:
 
 ```bash
 synthadoc ingest "https://www.youtube.com/watch?v=O5nskjZ_GoI"
-synthadoc ingest "https://youtu.be/O5nskjZ_GoI"              # short-link form
 ```
 
 This ingests *Early Computing: Crash Course Computer Science #1*, which covers Hollerith,
