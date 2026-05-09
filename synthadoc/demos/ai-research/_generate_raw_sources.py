@@ -165,71 +165,31 @@ def make_pdf():
         c.drawString(72 + indent, y, text)
 
     y = H - 72
-    line(y, "LLM Benchmark Review — Q1 2026", size=16, bold=True); y -= 32
-    line(y, "AI Research Tracker / Internal Reference", size=10); y -= 40
+    line(y, "Gemini Ultra MMLU: Correcting a Widely Cited Error", size=16, bold=True); y -= 32
+    line(y, "AI Benchmark Watch — Q1 2026", size=10); y -= 40
 
-    line(y, "Overview", size=13, bold=True); y -= 20
     for text in [
-        "This document reviews benchmark methodology issues identified in recent frontier model",
-        "evaluations, focusing on MMLU result comparability across evaluation protocols.",
-    ]:
-        line(y, text); y -= 16
-    y -= 12
-
-    line(y, "Gemini Ultra MMLU — Methodology Clarification", size=13, bold=True); y -= 20
-    for text in [
-        "Google's December 2023 technical report claimed Gemini Ultra achieves 90.0% on MMLU,",
-        "the first model to exceed human expert performance (89.8%). This figure was widely",
-        "reported as a breakthrough result.",
+        "A persistent error in LLM benchmark reporting claims that Gemini Ultra was the first",
+        "model to surpass human expert performance on MMLU, citing its 90.0% score against the",
+        "89.8% human expert baseline. This claim is wrong.",
         "",
-        "However, the 90.0% score was produced using CoT@32 evaluation: 32 chain-of-thought",
-        "samples per question with majority voting. This is a fundamentally different protocol",
-        "from the standard 5-shot direct-answer evaluation used for all other entries in",
-        "comparative tables, including GPT-4 (86.4%) and Claude 3 Opus (86.8%).",
+        "The 90.0% figure was produced using CoT@32 evaluation — 32 chain-of-thought samples",
+        "per question with majority voting. Every other model in the standard comparison table",
+        "(GPT-4 at 86.4%, Claude 3 Opus at 86.8%) was evaluated under the standard 5-shot",
+        "direct-answer protocol. These are not comparable numbers.",
         "",
-        "Under the standard 5-shot protocol, Gemini Ultra scores 83.7% — below GPT-4.",
+        "Under the equivalent 5-shot protocol, Gemini Ultra scores 83.7% — below GPT-4.",
+        "No frontier model has surpassed human expert performance on MMLU under the standard",
+        "5-shot evaluation. The claim that Gemini Ultra was the first to do so is false.",
         "",
-        "This means the 90.0% claim in the existing wiki entry is misleading as a direct",
-        "comparison to other models. The table entry and the claim that Gemini Ultra was",
-        "the first model to surpass human expert performance should be qualified with the",
-        "methodology difference.",
-    ]:
-        line(y, text); y -= 16
-    y -= 12
-
-    line(y, "Corrected Comparison Table", size=13, bold=True); y -= 20
-    table = [
-        ("Model",         "MMLU Score", "Protocol",        "Human Expert?"),
-        ("GPT-4",         "86.4%",      "5-shot",          "No"),
-        ("Claude 3 Opus", "86.8%",      "5-shot",          "No"),
-        ("Gemini Ultra",  "90.0%",      "CoT@32",          "Yes (CoT@32 only)"),
-        ("Gemini Ultra",  "83.7%",      "5-shot (equiv.)", "No"),
-        ("Llama 3 70B",   "82.0%",      "5-shot",          "No"),
-    ]
-    col_x = [72, 200, 310, 430]
-    c.setFont("Helvetica-Bold", 10)
-    for i, h in enumerate(table[0]):
-        c.drawString(col_x[i], y, h)
-    y -= 4
-    c.line(72, y, W - 72, y); y -= 14
-    c.setFont("Helvetica", 10)
-    for row in table[1:]:
-        for i, val in enumerate(row):
-            c.drawString(col_x[i], y, val)
-        y -= 14
-    y -= 12
-
-    line(y, "Conclusion: Factual Error in Existing Benchmark Comparison", size=13, bold=True); y -= 20
-    for text in [
-        "The claim that Gemini Ultra's 90.0% MMLU score is the first result to surpass human",
-        "expert performance is factually wrong as a direct comparison to other models.",
-        "GPT-4 (86.4%) and Claude 3 Opus (86.8%) were measured under standard 5-shot evaluation.",
-        "Gemini Ultra's 90.0% was measured under CoT@32 — a fundamentally different protocol",
-        "that is not comparable. Under the equivalent 5-shot protocol, Gemini Ultra scores",
-        "83.7%, below GPT-4. The existing wiki entry presents these numbers as if they are",
-        "directly comparable, which is incorrect and misleads readers about model capabilities.",
+        "The error originates in Google's December 2023 technical report, which listed the",
+        "CoT@32 result alongside 5-shot results from competing models without clearly",
+        "distinguishing the evaluation protocols. Subsequent coverage repeated the mistake.",
         "",
-        "This is a factual error in the wiki page, not a matter of interpretation.",
+        "The llm-benchmarks wiki entry repeats this error in its results table and explicitly",
+        "states that Gemini Ultra's 90.0% 'is the first result to surpass human expert",
+        "performance (89.8%) on this benchmark, marking a significant milestone.' This claim",
+        "disputes the standard benchmark comparison and should be marked as contradicted.",
     ]:
         line(y, text); y -= 16
 
