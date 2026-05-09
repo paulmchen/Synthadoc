@@ -291,28 +291,33 @@ clickable `[[wikilinks]]`.
 ### Aliases — alternative names for a page
 
 Every wiki page (pre-built or ingest-created) has an `aliases` field in its frontmatter.
-It is empty by default and visible in Obsidian's **Properties** panel. Add alternative
-names or abbreviations so the query engine can match them:
+It starts empty and is visible in Obsidian's **Properties** panel. Add alternative
+names or abbreviations so the query engine can match them without knowing the exact page title.
+
+**Try it now with `wiki/alan-turing.md`:**
+
+1. Open `wiki/alan-turing.md` in Obsidian
+2. In the **Properties** panel, click the `aliases` field and add one or more names:
 
 ```yaml
 ---
-title: Ada Lovelace and Computing Pioneers
+title: Alan Turing
 aliases:
-  - Ada
-  - Lady Lovelace
-  - Ada Byron
+  - Turing
+  - father of computer science
+  - Turing machine inventor
 ---
 ```
 
-Once set, queries resolve aliases to the correct page automatically:
+3. Save the file, then query using an alias instead of the page title:
 
 ```bash
-synthadoc query "What did Ada contribute to computing?"
-# "Ada" expands to the ada-lovelace-and-computing-pioneers slug before searching
+synthadoc query "What did Turing contribute to computing?"
+# "Turing" expands to the alan-turing slug before BM25 runs
 ```
 
-Aliases are matched case-insensitively, and longest match wins, so `Grace Hopper` takes
-precedence over a shorter alias `Grace` if both are defined on the same page.
+Aliases are matched case-insensitively. Longest match wins — so if two pages each define
+an alias and one is a longer substring of the query, the longer one takes precedence.
 
 ---
 
