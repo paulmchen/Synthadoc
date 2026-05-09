@@ -482,6 +482,9 @@ synthadoc install history-of-computing --target ~/wikis --demo
 
 # List available demo templates
 synthadoc demo list
+
+# Install the Obsidian plugin directly into the active Obsidian vault
+synthadoc plugin install history-of-computing
 ```
 
 ### Switching the active wiki
@@ -923,4 +926,3 @@ For full examples, API signatures, and intent-dispatch config see [docs/design.m
 - Design document: [docs/design.md](docs/design.md)
 - Quick-Start Guide: [docs/user-quick-start-guide.md](docs/user-quick-start-guide.md)
 - Contributing: [CONTRIBUTING.md](CONTRIBUTING.md)
-- Issues: [GitHub Issues](../../issues)

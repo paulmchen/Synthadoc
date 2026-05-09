@@ -838,6 +838,8 @@ into named topic branches so queries only search the most relevant slice — red
 improving retrieval precision, and significantly cutting search latency on large wikis (see
 [Appendix H](#appendix-h--bm25-routing-performance-benchmarks) for measured results).
 
+![ROUTING.md scoped query flow](png/synthadoc-routing.png)
+
 ### Generate ROUTING.md from your current index
 
 ```bash
@@ -940,6 +942,8 @@ Candidates (3):
   punch-card-era                   confidence: low      ingested: 2026-05-06T14:22:45
   vacuum-tube-computers            confidence: medium   ingested: 2026-05-06T14:23:01
 ```
+
+![Candidates list in Obsidian](png/synthadoc-candidates.png)
 
 ### Promote or discard
 
