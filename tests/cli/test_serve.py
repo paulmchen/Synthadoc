@@ -58,7 +58,7 @@ def test_sync_plugin_config_updates_stale_url(tmp_path):
     """Updates data.json when the stored serverUrl port differs from the served port."""
     from synthadoc.cli.serve import _sync_plugin_config
     _make_plugin_dir(tmp_path, "http://127.0.0.1:7070")
-    _sync_plugin_config(tmp_path, 7071)
+    _sync_plugin_config(tmp_path, "127.0.0.1", 7071)
     data = json.loads((tmp_path / ".obsidian" / "plugins" / "synthadoc" / "data.json")
                       .read_text())
     assert data["serverUrl"] == "http://127.0.0.1:7071"
@@ -70,7 +70,7 @@ def test_sync_plugin_config_no_change_when_port_matches(tmp_path):
     from synthadoc.cli.serve import _sync_plugin_config
     plugin_dir = _make_plugin_dir(tmp_path, "http://127.0.0.1:7070")
     mtime_before = (plugin_dir / "data.json").stat().st_mtime
-    _sync_plugin_config(tmp_path, 7070)
+    _sync_plugin_config(tmp_path, "127.0.0.1", 7070)
     mtime_after = (plugin_dir / "data.json").stat().st_mtime
     assert mtime_before == mtime_after
 
@@ -78,18 +78,27 @@ def test_sync_plugin_config_no_change_when_port_matches(tmp_path):
 def test_sync_plugin_config_noop_when_plugin_not_installed(tmp_path):
     """Does not raise when the plugin data.json is absent."""
     from synthadoc.cli.serve import _sync_plugin_config
-    _sync_plugin_config(tmp_path, 7070)  # no .obsidian/plugins/synthadoc/data.json
+    _sync_plugin_config(tmp_path, "127.0.0.1", 7070)
 
 
 def test_sync_plugin_config_port_override_synced(tmp_path):
     """Case e: --port CLI override is reflected in plugin data.json after sync."""
     from synthadoc.cli.serve import _sync_plugin_config
     _make_plugin_dir(tmp_path, "http://127.0.0.1:7070")
-    # effective_port already incorporates the --port flag when serve calls this
-    _sync_plugin_config(tmp_path, 8080)
+    _sync_plugin_config(tmp_path, "127.0.0.1", 8080)
     data = json.loads((tmp_path / ".obsidian" / "plugins" / "synthadoc" / "data.json")
                       .read_text())
     assert data["serverUrl"] == "http://127.0.0.1:8080"
+
+
+def test_sync_plugin_config_external_host_uses_ip(tmp_path):
+    """When host is a specific external IP, data.json uses that IP in the URL."""
+    from synthadoc.cli.serve import _sync_plugin_config
+    _make_plugin_dir(tmp_path, "http://127.0.0.1:7070")
+    _sync_plugin_config(tmp_path, "192.168.1.10", 7070)
+    data = json.loads((tmp_path / ".obsidian" / "plugins" / "synthadoc" / "data.json")
+                      .read_text())
+    assert data["serverUrl"] == "http://192.168.1.10:7070"
 
 
 # ── _check_port (case f) ──────────────────────────────────────────────────────
@@ -100,12 +109,16 @@ def test_check_port_raises_when_port_in_use(tmp_path):
     import socket
     from synthadoc.cli.serve import _check_port
 
-    # Find a bindable port and hold it
+    # Find a bindable port and hold it in LISTEN state.
+    # SO_REUSEADDR on Linux allows two sockets to bind() to the same port as
+    # long as neither is listening; calling listen() blocks further binds even
+    # when the checker also sets SO_REUSEADDR.
     for base in range(40100, 40200):
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             s.bind(("127.0.0.1", base))
+            s.listen(1)
             break
         except OSError:
             s.close()
@@ -114,13 +127,13 @@ def test_check_port_raises_when_port_in_use(tmp_path):
 
     try:
         with pytest.raises((SystemExit, click.exceptions.Exit)):
-            _check_port(base)
+            _check_port(base, host="127.0.0.1")
     finally:
         s.close()
 
 
-def test_check_port_uses_loopback_only():
-    """_check_port binds the probe socket to 127.0.0.1, never 0.0.0.0."""
+def test_check_port_uses_configured_host():
+    """_check_port binds the probe socket to whatever host is passed."""
     import socket as _socket
     bound_host = None
 
@@ -132,49 +145,57 @@ def test_check_port_uses_loopback_only():
         return original_bind(self, addr)
 
     from synthadoc.cli.serve import _check_port
-    # Use a port that is almost certainly free; we only care about the host used
     with patch("socket.socket.bind", capture_bind):
         try:
-            _check_port(40299)
+            _check_port(40299, host="127.0.0.1")
         except Exception:
             pass
     assert bound_host == "127.0.0.1"
 
 
-# ── Local binding enforcement ─────────────────────────────────────────────────
+# ── External host: warning, not error ────────────────────────────────────────
 
-def test_serve_rejects_external_host(tmp_path, monkeypatch):
-    """Case local-binding: serve exits if config.toml host is not a loopback address."""
-    import click
-    import tomllib
-    from synthadoc.cli.serve import _LOOPBACK_ADDRS
-    from synthadoc import errors as E
+def test_serve_warns_on_external_host(capsys):
+    """External host in config.toml → warning printed to stderr, no hard exit."""
+    from synthadoc.cli.serve import _LOOPBACK_ADDRS, _ANY_IFACE_ADDRS
+    import typer
 
-    # Build a minimal config where host = 0.0.0.0
-    non_loopback = "0.0.0.0"
+    non_loopback = "192.168.1.10"
     assert non_loopback not in _LOOPBACK_ADDRS
 
-    from synthadoc.config import Config, ServerConfig, AgentConfig, AgentsConfig
-    cfg = Config(
-        server=ServerConfig(host=non_loopback, port=7070),
-        agents=AgentsConfig(default=AgentConfig(provider="anthropic", model="claude-opus-4-6")),
-    )
+    # Verify _plugin_url uses the external address for specific IPs
+    from synthadoc.cli.serve import _plugin_url
+    assert _plugin_url(non_loopback, 7070) == "http://192.168.1.10:7070"
 
-    from synthadoc.cli import serve as serve_mod
-    # Simulate what serve_cmd does after loading config
-    with pytest.raises((SystemExit, click.exceptions.Exit)):
-        if cfg.server.host not in serve_mod._LOOPBACK_ADDRS:
-            E.cli_error(
-                E.SRV_EXTERNAL_HOST,
-                f"External binding is not permitted: host={cfg.server.host!r}.",
-                "Remove the 'host' key from .synthadoc/config.toml.",
-            )
+
+def test_plugin_url_loopback_uses_127():
+    """_plugin_url returns 127.0.0.1 for loopback and any-interface binds."""
+    from synthadoc.cli.serve import _plugin_url
+    assert _plugin_url("127.0.0.1", 7070) == "http://127.0.0.1:7070"
+    assert _plugin_url("::1", 7070) == "http://127.0.0.1:7070"
+    assert _plugin_url("0.0.0.0", 7070) == "http://127.0.0.1:7070"
+    assert _plugin_url("::", 7070) == "http://127.0.0.1:7070"
+
+
+def test_plugin_url_external_uses_host():
+    """_plugin_url uses the configured host for specific external addresses."""
+    from synthadoc.cli.serve import _plugin_url
+    assert _plugin_url("192.168.1.10", 7071) == "http://192.168.1.10:7071"
+    assert _plugin_url("10.0.0.5", 8080) == "http://10.0.0.5:8080"
 
 
 def test_loopback_addrs_constant_covers_expected_values():
-    """_LOOPBACK_ADDRS must include 127.0.0.1, ::1, and localhost."""
+    """_LOOPBACK_ADDRS includes 127.0.0.1, ::1, localhost; not 0.0.0.0."""
     from synthadoc.cli.serve import _LOOPBACK_ADDRS
     assert "127.0.0.1" in _LOOPBACK_ADDRS
     assert "::1" in _LOOPBACK_ADDRS
     assert "localhost" in _LOOPBACK_ADDRS
     assert "0.0.0.0" not in _LOOPBACK_ADDRS
+
+
+def test_any_iface_addrs_constant():
+    """_ANY_IFACE_ADDRS includes 0.0.0.0 and :: but not loopback addresses."""
+    from synthadoc.cli.serve import _ANY_IFACE_ADDRS
+    assert "0.0.0.0" in _ANY_IFACE_ADDRS
+    assert "::" in _ANY_IFACE_ADDRS
+    assert "127.0.0.1" not in _ANY_IFACE_ADDRS

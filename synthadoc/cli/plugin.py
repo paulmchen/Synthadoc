@@ -22,22 +22,36 @@ _PLUGIN_FILES = ("main.js", "manifest.json", "styles.css")
 _PLUGIN_ID = "synthadoc"
 
 
+_LOOPBACK_ADDRS = frozenset({"127.0.0.1", "::1", "localhost"})
+_ANY_IFACE_ADDRS = frozenset({"0.0.0.0", "::"})
+
+
 def _write_plugin_data(wiki_path: Path, plugin_dir: Path) -> None:
     """Write (or update) data.json with the wiki's server URL.
 
-    Reads the port from the wiki's config.toml.  If data.json already exists
-    (e.g. the user has customised other settings), only ``serverUrl`` is
-    updated — all other keys are preserved.
+    Reads host and port from the wiki's config.toml.  If data.json already
+    exists (e.g. the user has customised other settings), only ``serverUrl``
+    is updated — all other keys are preserved.
     """
     import tomllib
+    host = "127.0.0.1"
     port = 7070
     config_path = wiki_path / ".synthadoc" / "config.toml"
     if config_path.exists():
         try:
-            data = tomllib.loads(config_path.read_text(encoding="utf-8"))
-            port = data.get("server", {}).get("port", 7070)
+            cfg = tomllib.loads(config_path.read_text(encoding="utf-8"))
+            srv = cfg.get("server", {})
+            host = srv.get("host", "127.0.0.1")
+            port = srv.get("port", 7070)
         except Exception:
             pass
+
+    # Loopback and any-interface binds → plugin connects via 127.0.0.1 locally.
+    # Specific external address → use it directly for remote vault support.
+    if host in _LOOPBACK_ADDRS or host in _ANY_IFACE_ADDRS:
+        server_url = f"http://127.0.0.1:{port}"
+    else:
+        server_url = f"http://{host}:{port}"
 
     data_json = plugin_dir / "data.json"
     existing: dict = {}
@@ -47,7 +61,7 @@ def _write_plugin_data(wiki_path: Path, plugin_dir: Path) -> None:
         except Exception:
             pass
 
-    existing["serverUrl"] = f"http://127.0.0.1:{port}"
+    existing["serverUrl"] = server_url
     data_json.write_text(json.dumps(existing, indent=2), encoding="utf-8")
 
 
