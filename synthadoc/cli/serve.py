@@ -26,6 +26,47 @@ _PROVIDER_HOSTS = {
     "groq":      ("api.groq.com", 443),
 }
 
+# synthadoc is a localhost-only service.  Only loopback addresses are permitted.
+_LOOPBACK_ADDRS: frozenset[str] = frozenset({"127.0.0.1", "::1", "localhost"})
+
+
+def _sync_plugin_config(wiki_root: Path, port: int) -> None:
+    """Update the Obsidian plugin data.json if its serverUrl port differs from the served port.
+
+    Called at startup so that manual config.toml edits are automatically
+    reflected in the plugin — the user only needs to reload Obsidian.
+    Silently no-ops if the plugin is not installed in this vault.
+    """
+    import json
+    data_json = wiki_root / ".obsidian" / "plugins" / "synthadoc" / "data.json"
+    if not data_json.exists():
+        return
+    try:
+        data = json.loads(data_json.read_text(encoding="utf-8"))
+        expected_url = f"http://127.0.0.1:{port}"
+        if data.get("serverUrl") != expected_url:
+            old_url = data.get("serverUrl", "(none)")
+            data["serverUrl"] = expected_url
+            data_json.write_text(json.dumps(data, indent=2), encoding="utf-8")
+            typer.echo(
+                f"Notice: plugin server URL updated {old_url!r} → {expected_url!r}.\n"
+                f"Reload Obsidian (Cmd+R / Ctrl+R) if it is already open."
+            )
+    except Exception:
+        pass  # never block startup due to a plugin config issue
+
+
+def _sync_registry_port(wiki_name: str, port: int) -> None:
+    """Update the registry port for a wiki when it differs (e.g. config.toml edited manually)."""
+    from synthadoc.cli.install import _read_registry, _write_registry
+    try:
+        registry = _read_registry()
+        if wiki_name in registry and registry[wiki_name].get("port") != port:
+            registry[wiki_name]["port"] = port
+            _write_registry(registry)
+    except Exception:
+        pass
+
 
 def _check_port(port: int) -> None:
     """Fail early if the port is already bound by another process."""
@@ -202,6 +243,19 @@ def serve_cmd(
         _apply_provider_override(cfg, provider_override)
 
     provider = cfg.agents.resolve("ingest").provider
+
+    # Enforce localhost-only binding before anything else touches the network
+    if cfg.server.host not in _LOOPBACK_ADDRS:
+        E.cli_error(
+            E.SRV_EXTERNAL_HOST,
+            f"External binding is not permitted: host={cfg.server.host!r}.",
+            "synthadoc is a localhost-only service. Remove the 'host' key from\n"
+            ".synthadoc/config.toml or set it to host = \"127.0.0.1\".",
+        )
+
+    # Keep registry and plugin in sync if config.toml port was manually changed
+    _sync_registry_port(wiki or "", effective_port)
+    _sync_plugin_config(root, effective_port)
 
     # Pre-flight checks — run before binding the port or starting workers
     _check_wiki(root, wiki_arg=wiki or "")
