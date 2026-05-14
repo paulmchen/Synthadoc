@@ -1843,7 +1843,7 @@ class QueryModal extends Modal {
 class RoutingModal extends Modal {
     onOpen(): void {
         const { contentEl, modalEl } = this;
-        modalEl.style.width = "clamp(460px, 55vw, 720px)";
+        modalEl.style.width = "clamp(560px, 65vw, 900px)";
 
         const bg = this.containerEl.querySelector(".modal-bg");
         if (bg) bg.addEventListener("click", e => e.stopImmediatePropagation(), { capture: true });
@@ -1854,7 +1854,7 @@ class RoutingModal extends Modal {
         const contentBox = contentEl.createEl("pre");
         contentBox.style.cssText = "display:none;border:1px solid var(--background-modifier-border);"
             + "border-radius:4px;padding:8px;margin-bottom:12px;font-size:12px;"
-            + "white-space:pre-wrap;overflow-y:auto;max-height:120px;";
+            + "white-space:pre-wrap;overflow-y:auto;max-height:45vh;";
 
         const statusMsg = contentEl.createEl("p");
         statusMsg.style.cssText = "margin-bottom:12px;font-size:13px;";
