@@ -188,6 +188,11 @@ class AnalyseRequest(BaseModel):
         return v
 
 
+class StagingPolicyRequest(BaseModel):
+    policy: str
+    confidence_min: str | None = None
+
+
 def _parse_retry_after(exc: Exception, default: float = 60.0) -> float:
     """Parse 'Please try again in Xm Y.Zs' from a rate-limit error message."""
     m = re.search(r"Please try again in (?:(\d+)m\s*)?(\d+(?:\.\d+)?)s", str(exc))
@@ -613,10 +618,6 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
         }
 
     # ── Staging policy ────────────────────────────────────────────────────────
-    class _StagingPolicyReq(BaseModel):
-        policy: str
-        confidence_min: str | None = None
-
     def _staging_cfg_path() -> Path:
         return app.state.orch._root / ".synthadoc" / "config.toml"
 
@@ -632,7 +633,7 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
         }
 
     @app.post("/staging/policy")
-    async def staging_policy_set(req: _StagingPolicyReq):
+    async def staging_policy_set(req: StagingPolicyRequest):
         import tomllib as _tomllib
         from synthadoc.cli.candidates import _patch_toml as _cand_patch_toml
         if req.policy not in ("off", "all", "threshold"):
