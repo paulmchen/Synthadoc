@@ -613,12 +613,6 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
         }
 
     # ── Staging policy ────────────────────────────────────────────────────────
-    import tomllib as _tomllib
-    from synthadoc.cli.candidates import _patch_toml as _cand_patch_toml
-    from synthadoc.cli.candidates import _read_frontmatter as _cand_read_fm
-    from synthadoc.cli.candidates import _add_to_index as _cand_add_to_index
-    from synthadoc.cli.candidates import _page_title as _cand_page_title
-
     class _StagingPolicyReq(BaseModel):
         policy: str
         confidence_min: str | None = None
@@ -628,6 +622,7 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
 
     @app.get("/staging/policy")
     async def staging_policy_get():
+        import tomllib as _tomllib
         cfg_path = _staging_cfg_path()
         raw = _tomllib.loads(cfg_path.read_text(encoding="utf-8")) if cfg_path.exists() else {}
         ig = raw.get("ingest", {})
@@ -638,6 +633,8 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
 
     @app.post("/staging/policy")
     async def staging_policy_set(req: _StagingPolicyReq):
+        import tomllib as _tomllib
+        from synthadoc.cli.candidates import _patch_toml as _cand_patch_toml
         if req.policy not in ("off", "all", "threshold"):
             raise HTTPException(400, "policy must be off, all, or threshold")
         if req.confidence_min and req.confidence_min not in ("high", "medium", "low"):
@@ -664,6 +661,7 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
 
     @app.get("/candidates")
     async def candidates_list():
+        from synthadoc.cli.candidates import _read_frontmatter as _cand_read_fm
         cd = _cand_dir()
         pages = sorted(cd.glob("*.md")) if cd.exists() else []
         result = []
@@ -679,6 +677,9 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
 
     @app.post("/candidates/promote-all")
     async def candidates_promote_all():
+        from synthadoc.cli.candidates import _read_frontmatter as _cand_read_fm
+        from synthadoc.cli.candidates import _add_to_index as _cand_add_to_index
+        from synthadoc.cli.candidates import _page_title as _cand_page_title
         cd = _cand_dir()
         wd = _wiki_dir()
         pages = sorted(cd.glob("*.md")) if cd.exists() else []
@@ -706,6 +707,8 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
 
     @app.post("/candidates/{slug}/promote")
     async def candidates_promote_one(slug: str):
+        from synthadoc.cli.candidates import _add_to_index as _cand_add_to_index
+        from synthadoc.cli.candidates import _page_title as _cand_page_title
         cd = _cand_dir()
         wd = _wiki_dir()
         src = cd / f"{slug}.md"
