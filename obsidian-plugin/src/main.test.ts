@@ -1376,6 +1376,47 @@ describe("ContextModal", () => {
         expect(resultArea.value).not.toContain("Tags:");
     });
 
+    it("shows saved filename in the feedback note after Save as click", async () => {
+        const { ModalClass, apiMock } = await getModal("synthadoc-context");
+        apiMock.contextBuild.mockResolvedValueOnce(makeContextPack());
+
+        // Stub browser download globals so the save handler doesn't throw in Node
+        const mockA = { href: "", download: "", click: vi.fn() };
+        vi.stubGlobal("document", {
+            createElement: vi.fn().mockReturnValue(mockA),
+            body: { appendChild: vi.fn(), removeChild: vi.fn() },
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+        });
+        // Patch static methods directly so URL remains a valid constructor
+        const origCreateObjectURL = (URL as any).createObjectURL;
+        const origRevokeObjectURL = (URL as any).revokeObjectURL;
+        (URL as any).createObjectURL = vi.fn().mockReturnValue("blob:mock");
+        (URL as any).revokeObjectURL = vi.fn();
+
+        const modal = new ModalClass();
+        modal.onOpen();
+
+        const goalInput = modal.contentEl.querySelector("textarea") as any;
+        goalInput.value = "early computing pioneers";
+        const buildBtn = modal.contentEl.querySelector("button") as any;
+        await buildBtn.onclick();
+        await flushPromises();
+
+        // saveBtn = actionRow._children[1]; actionRow = resultSection._children[3]
+        const saveBtn = modal.contentEl._children[6]._children[3]._children[1];
+        saveBtn.onclick();
+
+        // copyNote = actionRow._children[2]
+        const copyNote = modal.contentEl._children[6]._children[3]._children[2];
+        expect(copyNote.textContent).toContain("✅ Saved as");
+        expect(copyNote.textContent).toContain("early-computing-pioneers.md");
+
+        vi.unstubAllGlobals();
+        (URL as any).createObjectURL = origCreateObjectURL;
+        (URL as any).revokeObjectURL = origRevokeObjectURL;
+    });
+
     it("formats relevance to exactly 2 decimal places in the heading", async () => {
         const { ModalClass, apiMock } = await getModal("synthadoc-context");
         apiMock.contextBuild.mockResolvedValueOnce(makeContextPack({

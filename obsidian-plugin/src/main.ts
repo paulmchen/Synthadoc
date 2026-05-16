@@ -2533,6 +2533,8 @@ class ContextModal extends Modal {
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+            copyNote.textContent = `✅ Saved as ${filename}`;
+            setTimeout(() => { copyNote.textContent = ""; }, 3000);
         };
 
         // Build handler
