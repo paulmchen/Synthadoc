@@ -538,9 +538,11 @@ class IngestModal extends Modal {
         folderRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px";
         folderRow.createEl("label", { text: "Folder" }).style.cssText = "white-space:nowrap;font-size:13px";
         let selectedFolder = "";
-        const folderDisplay = folderRow.createEl("span");
-        folderDisplay.style.cssText = "flex:1;padding:4px 8px;font-size:13px;color:var(--text-muted);background:var(--background-secondary);border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
-        folderDisplay.appendText("Click Browse… to select a folder");
+        const folderDisplay = folderRow.createEl("input") as HTMLInputElement;
+        folderDisplay.type = "text";
+        folderDisplay.readOnly = true;
+        folderDisplay.placeholder = "Click Browse… to select a folder";
+        folderDisplay.style.cssText = "flex:1;min-width:0;padding:4px 8px;font-size:13px;color:var(--text-muted);background:var(--background-secondary);border:1px solid transparent;border-radius:4px;cursor:default;outline:none";
 
         const browseBtn = folderRow.createEl("button", { text: "Browse…" }) as HTMLButtonElement;
         browseBtn.onclick = async () => {
@@ -556,8 +558,7 @@ class IngestModal extends Modal {
                         ? absPath.slice(basePath.length).replace(/^[/\\]+/, "").replace(/\\/g, "/")
                         : absPath.replace(/\\/g, "/");
                     selectedFolder = rel;
-                    folderDisplay.empty();
-                    folderDisplay.appendText(rel);
+                    folderDisplay.value = rel;
                     folderDisplay.style.color = "var(--text-normal)";
                     scanBtn.disabled = false;
                 }
