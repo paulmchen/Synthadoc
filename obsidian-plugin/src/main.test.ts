@@ -189,12 +189,12 @@ describe("IngestModal All-sources tab", () => {
     });
 
     // contentEl children: [0]=h3, [1]=tabBar, [2]=WS panel, [3]=URL panel, [4]=All-sources panel, [5]=Pick-files panel
-    // All-sources panel: [0]=folderRow([0]=label,[1]=folderDisplay), [1]=statusEl, [2]=forceRow, [3]=btnRow([0]=ingestBtn)
+    // All-sources panel: [0]=desc, [1]=folderRow([0]=label,[1]=folderDisplay), [2]=statusEl, [3]=forceRow, [4]=btnRow([0]=ingestBtn)
     const getAllSources = (modal: any) => {
         const panel = modal.contentEl._children[4];
         return {
-            folderDisplay: panel._children[0]._children[1] as any,
-            ingestBtn:     panel._children[3]._children[0] as any,
+            folderDisplay: panel._children[1]._children[1] as any,
+            ingestBtn:     panel._children[4]._children[0] as any,
         };
     };
 
@@ -719,13 +719,13 @@ describe("IngestModal Pick-files tab", () => {
     });
 
     // contentEl children: [0]=h3, [1]=tabBar, [2]=WS panel, [3]=URL panel, [4]=All-sources panel, [5]=Pick-files panel
-    // Pick-files panel: [0]=folderRow([0]=label,[1]=display,[2]=browseBtn,[3]=scanBtn), [1]=selectRow, [2]=listEl, [3]=statusEl, [4]=forceRow, [5]=btnRow
+    // Pick-files panel: [0]=desc, [1]=folderRow([0]=label,[1]=display,[2]=browseBtn,[3]=scanBtn), [2]=selectRow, [3]=listEl, [4]=statusEl, [5]=forceRow, [6]=btnRow
     const getPickFiles = (modal: any) => {
         const panel = modal.contentEl._children[5];
         return {
-            scanBtn:   panel._children[0]._children[3] as any,
-            listEl:    panel._children[2] as any,
-            ingestBtn: panel._children[5]._children[0] as any,
+            scanBtn:   panel._children[1]._children[3] as any,
+            listEl:    panel._children[3] as any,
+            ingestBtn: panel._children[6]._children[0] as any,
         };
     };
 
@@ -1671,9 +1671,9 @@ describe("LintReportModal", () => {
 
 describe("IngestModal URL tab", () => {
     // contentEl children: [0]=h3, [1]=tabBar, [2]=WS panel, [3]=URL panel, [4]=All-sources panel, [5]=Pick-files panel
-    // URL panel: [0]=row([0]=input, [1]=btn), [1]=forceRow, [2]=out
+    // URL panel: [0]=desc, [1]=row([0]=input, [1]=btn), [2]=forceRow, [3]=out
     const getUrlTab = (modal: any) => {
-        const row = modal.contentEl._children[3]._children[0];
+        const row = modal.contentEl._children[3]._children[1];
         return { input: row._children[0] as any, btn: row._children[1] as any };
     };
 

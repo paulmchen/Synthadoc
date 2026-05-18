@@ -365,6 +365,10 @@ class IngestModal extends Modal {
     }
 
     private _buildUrlTab(panel: HTMLElement) {
+        panel.createEl("p", {
+            text: "Paste a URL — Synthadoc will fetch, parse, and convert it into a wiki article. Supports web pages, PDFs, and YouTube videos.",
+        }).style.cssText = "font-size:12px;margin-bottom:10px;color:var(--text-muted)";
+
         const row = panel.createEl("div");
         row.style.cssText = "display:flex;gap:8px;margin-bottom:10px";
         const input = row.createEl("input", { type: "url", placeholder: "https://..." }) as HTMLInputElement;
@@ -431,6 +435,10 @@ class IngestModal extends Modal {
     }
 
     private _buildAllSourcesTab(panel: HTMLElement) {
+        panel.createEl("p", {
+            text: "Ingest every supported file in your configured raw sources folder in one click. Files already ingested are skipped unless Force re-ingest is checked.",
+        }).style.cssText = "font-size:12px;margin-bottom:10px;color:var(--text-muted)";
+
         const folderRow = panel.createEl("div");
         folderRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:12px";
         folderRow.createEl("label", { text: "Folder" }).style.cssText = "white-space:nowrap;font-size:13px;color:var(--text-muted)";
@@ -522,6 +530,10 @@ class IngestModal extends Modal {
     }
 
     private _buildPickFilesTab(panel: HTMLElement) {
+        panel.createEl("p", {
+            text: "Browse to any folder, scan for supported files, then select which ones to ingest. Great for one-off ingestion from a custom location.",
+        }).style.cssText = "font-size:12px;margin-bottom:10px;color:var(--text-muted)";
+
         const folderRow = panel.createEl("div");
         folderRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px";
         folderRow.createEl("label", { text: "Folder" }).style.cssText = "white-space:nowrap;font-size:13px";
@@ -544,8 +556,10 @@ class IngestModal extends Modal {
                         ? absPath.slice(basePath.length).replace(/^[/\\]+/, "").replace(/\\/g, "/")
                         : absPath.replace(/\\/g, "/");
                     selectedFolder = rel;
-                    folderDisplay.textContent = rel;
+                    folderDisplay.empty();
+                    folderDisplay.appendText(rel);
                     folderDisplay.style.color = "var(--text-normal)";
+                    scan();
                 }
             } catch { new Notice("Could not open folder picker"); }
         };
