@@ -877,6 +877,8 @@ class JobsModal extends Modal {
     private _nextBtn: HTMLButtonElement | null = null;
     private _pageLabel: HTMLElement | null = null;
     private _pageRow: HTMLElement | null = null;
+    private _sortBy: "created_at" | "status" | "operation" = "created_at";
+    private _sortOrder: "asc" | "desc" = "desc";
 
     onOpen() {
         this.modalEl.style.width = "clamp(760px, 80vw, 1100px)";
@@ -1001,14 +1003,25 @@ class JobsModal extends Modal {
         this._load();
     }
 
+    private _sortedJobs(): any[] {
+        const col = this._sortBy;
+        const dir = this._sortOrder === "asc" ? 1 : -1;
+        return [...this._filteredJobs].sort((a, b) => {
+            const av: string = a[col] ?? "";
+            const bv: string = b[col] ?? "";
+            return av < bv ? -dir : av > bv ? dir : 0;
+        });
+    }
+
     private _renderTable() {
         if (!this._tableEl) return;
         this._tableEl.empty();
 
-        const total = this._filteredJobs.length;
+        const sorted = this._sortedJobs();
+        const total = sorted.length;
         const totalPages = Math.max(1, Math.ceil(total / JOBS_PAGE_SIZE));
         this._page = Math.min(this._page, totalPages - 1);
-        const jobs = this._filteredJobs.slice(this._page * JOBS_PAGE_SIZE, (this._page + 1) * JOBS_PAGE_SIZE);
+        const jobs = sorted.slice(this._page * JOBS_PAGE_SIZE, (this._page + 1) * JOBS_PAGE_SIZE);
 
         // Update pagination controls
         if (this._prevBtn) this._prevBtn.disabled = this._page === 0;
@@ -1047,9 +1060,34 @@ class JobsModal extends Modal {
             selectAllCb.indeterminate = !selectAllCb.checked && terminalJobs.some((j: any) => this._checkedIds.has(j.id));
         }
 
-        for (const h of ["Job ID", "Status", "Operation", "Source", "Created"]) {
-            const th = hrow.createEl("th", { text: h });
+        const SORT_HEADERS: { label: string; col: "status" | "operation" | "created_at" | null }[] = [
+            { label: "Job ID", col: null },
+            { label: "Status", col: "status" },
+            { label: "Operation", col: "operation" },
+            { label: "Source", col: null },
+            { label: "Created", col: "created_at" },
+        ];
+        for (const { label, col } of SORT_HEADERS) {
+            const th = hrow.createEl("th");
             th.style.cssText = "text-align:left;padding:4px 8px;border-bottom:1px solid var(--background-modifier-border)";
+            if (col) {
+                const indicator = this._sortBy === col ? (this._sortOrder === "asc" ? " ▲" : " ▼") : " ⇅";
+                th.setText(label + indicator);
+                th.style.cursor = "pointer";
+                th.title = `Sort by ${label}`;
+                th.onclick = () => {
+                    if (this._sortBy === col) {
+                        this._sortOrder = this._sortOrder === "asc" ? "desc" : "asc";
+                    } else {
+                        this._sortBy = col;
+                        this._sortOrder = "asc";
+                    }
+                    this._page = 0;
+                    this._renderTable();
+                };
+            } else {
+                th.setText(label);
+            }
         }
 
         const rowCheckboxes: HTMLInputElement[] = [];

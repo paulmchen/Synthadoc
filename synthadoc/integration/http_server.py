@@ -467,14 +467,14 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
         }
 
     @app.get("/jobs")
-    async def list_jobs(status: str | None = None):
+    async def list_jobs(status: str | None = None, sort: str = "created_at", order: str = "asc"):
         from synthadoc.core.queue import JobStatus
         try:
             job_status = JobStatus(status) if status else None
         except ValueError:
             from fastapi import HTTPException
             raise HTTPException(status_code=400, detail=f"Invalid status {status!r}. Valid values: {[s.value for s in JobStatus]}")
-        jobs = await app.state.orch.queue.list_jobs(status=job_status)
+        jobs = await app.state.orch.queue.list_jobs(status=job_status, sort_by=sort, order=order)
         return [{"id": j.id, "status": j.status, "operation": j.operation,
                  "created_at": str(j.created_at), "payload": j.payload,
                  "error": j.error, "result": j.result, "progress": j.progress} for j in jobs]

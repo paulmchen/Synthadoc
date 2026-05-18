@@ -1656,6 +1656,93 @@ describe("JobsModal", () => {
         expect(prevBtn.disabled).toBe(false);
         expect(nextBtn.disabled).toBe(true);
     });
+
+    it("default sort is created_at desc — newest job renders first", async () => {
+        const { ModalClass, apiMock } = await getModal("synthadoc-jobs");
+        apiMock.jobs.mockResolvedValueOnce([
+            { id: "job-old", status: "pending", operation: "ingest", payload: {}, created_at: "2026-01-01 00:00:00" },
+            { id: "job-new", status: "pending", operation: "ingest", payload: {}, created_at: "2026-01-02 00:00:00" },
+        ]);
+
+        const modal = new ModalClass();
+        modal.onOpen();
+        await flushPromises();
+
+        const html = modal.contentEl.innerHTML;
+        expect(html.indexOf("job-new")).toBeLessThan(html.indexOf("job-old"));
+    });
+
+    it("clicking Status header sorts by status asc", async () => {
+        const { ModalClass, apiMock } = await getModal("synthadoc-jobs");
+        apiMock.jobs.mockResolvedValueOnce([
+            { id: "job-z", status: "pending", operation: "ingest", payload: {}, created_at: null },
+            { id: "job-a", status: "in_progress", operation: "ingest", payload: {}, created_at: null },
+        ]);
+
+        const modal = new ModalClass();
+        modal.onOpen();
+        await flushPromises();
+
+        // Table header row: th[0]=checkbox, th[1]=Job ID, th[2]=Status, th[3]=Operation, th[4]=Source, th[5]=Created
+        const table = modal.contentEl._children[3]._children[0]; // tableEl > table
+        const hrow = table._children[0]._children[0];           // thead > tr
+        const statusTh = hrow._children[2];                     // Status th
+        expect(statusTh.innerHTML).toContain("Status");
+
+        statusTh.onclick();
+
+        const html = modal.contentEl.innerHTML;
+        // "in_progress" < "pending" alphabetically, so job-a (in_progress) should come first
+        expect(html.indexOf("job-a")).toBeLessThan(html.indexOf("job-z"));
+    });
+
+    it("clicking a sorted header again reverses the sort order", async () => {
+        const { ModalClass, apiMock } = await getModal("synthadoc-jobs");
+        apiMock.jobs.mockResolvedValueOnce([
+            { id: "job-z", status: "pending", operation: "ingest", payload: {}, created_at: null },
+            { id: "job-a", status: "in_progress", operation: "ingest", payload: {}, created_at: null },
+        ]);
+
+        const modal = new ModalClass();
+        modal.onOpen();
+        await flushPromises();
+
+        const table = modal.contentEl._children[3]._children[0];
+        const hrow = table._children[0]._children[0];
+        const statusTh = hrow._children[2];
+
+        // First click: asc (in_progress first)
+        statusTh.onclick();
+        let html = modal.contentEl.innerHTML;
+        expect(html.indexOf("job-a")).toBeLessThan(html.indexOf("job-z"));
+
+        // Second click: desc (pending first)
+        statusTh.onclick();
+        html = modal.contentEl.innerHTML;
+        expect(html.indexOf("job-z")).toBeLessThan(html.indexOf("job-a"));
+    });
+
+    it("clicking Operation header sorts by operation", async () => {
+        const { ModalClass, apiMock } = await getModal("synthadoc-jobs");
+        apiMock.jobs.mockResolvedValueOnce([
+            { id: "job-lint", status: "pending", operation: "lint", payload: {}, created_at: null },
+            { id: "job-ingest", status: "pending", operation: "ingest", payload: {}, created_at: null },
+        ]);
+
+        const modal = new ModalClass();
+        modal.onOpen();
+        await flushPromises();
+
+        const table = modal.contentEl._children[3]._children[0];
+        const hrow = table._children[0]._children[0];
+        const operationTh = hrow._children[3]; // Operation th
+
+        operationTh.onclick();
+
+        const html = modal.contentEl.innerHTML;
+        // "ingest" < "lint" — job-ingest should appear first
+        expect(html.indexOf("job-ingest")).toBeLessThan(html.indexOf("job-lint"));
+    });
 });
 
 // ── LintReportModal ───────────────────────────────────────────────────────────
