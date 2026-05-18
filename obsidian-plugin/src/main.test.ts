@@ -723,11 +723,20 @@ describe("IngestModal Pick-files tab", () => {
     const getPickFiles = (modal: any) => {
         const panel = modal.contentEl._children[5];
         return {
+            browseBtn: panel._children[1]._children[2] as any,
             scanBtn:   panel._children[1]._children[3] as any,
             listEl:    panel._children[3] as any,
             ingestBtn: panel._children[6]._children[0] as any,
         };
     };
+
+    // Simulate the electron folder-picker returning `folder` so Browse can update state.
+    const mockBrowse = (folder: string) => {
+        (window as any).require = (_mod: string) => ({
+            dialog: { showOpenDialog: async () => ({ canceled: false, filePaths: [folder] }) },
+        });
+    };
+    afterEach(() => { delete (window as any).require; });
 
     it("Scan button populates file list with checkboxes for supported files only", async () => {
         const { ModalClass } = await getModal("synthadoc-ingest",
@@ -739,7 +748,9 @@ describe("IngestModal Pick-files tab", () => {
         );
         const modal = new ModalClass();
         modal.onOpen();
-        const { scanBtn, listEl } = getPickFiles(modal);
+        const { browseBtn, scanBtn, listEl } = getPickFiles(modal);
+        mockBrowse("raw_sources");
+        await browseBtn.onclick();
         scanBtn.onclick();
 
         expect(listEl._children.length).toBe(2);
@@ -757,7 +768,9 @@ describe("IngestModal Pick-files tab", () => {
 
         const modal = new ModalClass();
         modal.onOpen();
-        const { scanBtn, listEl, ingestBtn } = getPickFiles(modal);
+        const { browseBtn, scanBtn, listEl, ingestBtn } = getPickFiles(modal);
+        mockBrowse("raw_sources");
+        await browseBtn.onclick();
         scanBtn.onclick();
 
         // Uncheck the second file
@@ -780,7 +793,9 @@ describe("IngestModal Pick-files tab", () => {
 
         const modal = new ModalClass();
         modal.onOpen();
-        const { scanBtn, ingestBtn } = getPickFiles(modal);
+        const { browseBtn, scanBtn, ingestBtn } = getPickFiles(modal);
+        mockBrowse("raw_sources");
+        await browseBtn.onclick();
         scanBtn.onclick();
 
         await ingestBtn.onclick();

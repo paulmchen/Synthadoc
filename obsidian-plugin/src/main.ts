@@ -537,10 +537,10 @@ class IngestModal extends Modal {
         const folderRow = panel.createEl("div");
         folderRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:8px";
         folderRow.createEl("label", { text: "Folder" }).style.cssText = "white-space:nowrap;font-size:13px";
-        let selectedFolder = this._rawSourcesFolder;
+        let selectedFolder = "";
         const folderDisplay = folderRow.createEl("span");
         folderDisplay.style.cssText = "flex:1;padding:4px 8px;font-size:13px;color:var(--text-muted);background:var(--background-secondary);border-radius:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap";
-        folderDisplay.textContent = selectedFolder;
+        folderDisplay.appendText("Click Browse… to select a folder");
 
         const browseBtn = folderRow.createEl("button", { text: "Browse…" }) as HTMLButtonElement;
         browseBtn.onclick = async () => {
@@ -559,12 +559,13 @@ class IngestModal extends Modal {
                     folderDisplay.empty();
                     folderDisplay.appendText(rel);
                     folderDisplay.style.color = "var(--text-normal)";
-                    scan();
+                    scanBtn.disabled = false;
                 }
             } catch { new Notice("Could not open folder picker"); }
         };
 
         const scanBtn = folderRow.createEl("button", { text: "Scan" }) as HTMLButtonElement;
+        scanBtn.disabled = true;
 
         const selectRow = panel.createEl("div");
         selectRow.style.cssText = "display:flex;gap:8px;align-items:center;margin-bottom:4px;font-size:12px";
@@ -575,7 +576,7 @@ class IngestModal extends Modal {
 
         const listEl = panel.createEl("div");
         listEl.style.cssText = "overflow-y:auto;max-height:180px;border:1px solid var(--background-modifier-border);border-radius:4px;padding:4px;margin-bottom:8px;font-size:12px";
-        listEl.createEl("span", { text: "Click Browse… or Scan to list files." }).style.cssText = "color:var(--text-muted);padding:4px;display:block";
+        listEl.createEl("span", { text: "Click Browse… to select a folder, then click Scan." }).style.cssText = "color:var(--text-muted);padding:4px;display:block";
 
         const statusEl = panel.createEl("div");
         statusEl.style.cssText = "min-height:28px;margin-bottom:8px;font-size:13px;-webkit-user-select:text;user-select:text";
