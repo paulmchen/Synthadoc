@@ -241,6 +241,12 @@ cd synthadoc
 pip3 install -e ".[dev]"
 ```
 
+If you already have Synthadoc wikis installed, upgrade the Obsidian plugin in all registered wikis to keep them in sync:
+
+```bash
+synthadoc plugin upgrade
+```
+
 ### Step 2 — Run the Python test suite
 
 Validate that the Python engine builds and all tests pass before proceeding:

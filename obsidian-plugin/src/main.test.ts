@@ -152,33 +152,6 @@ describe("SynthadocPlugin.ingestFile", () => {
     });
 });
 
-describe("SynthadocPlugin web search command", () => {
-    it("opens WebSearchModal — no longer shows coming-in-v2 notice", async () => {
-        const { Notice } = await import("obsidian");
-
-        const { default: SynthadocPlugin } = await import("./main");
-        const plugin = new SynthadocPlugin();
-        await plugin.onload();
-
-        const cmd = (plugin.addCommand as any).mock.calls.find(
-            (c: any) => c[0].id === "synthadoc-web-search"
-        )?.[0];
-        // Invoking the callback should not throw and must not show the old stub notice
-        cmd?.callback();
-
-        expect(Notice).not.toHaveBeenCalledWith(expect.stringContaining("coming in v2"));
-    });
-
-    it("web-search command is registered on onload", async () => {
-        const { default: SynthadocPlugin } = await import("./main");
-        const plugin = new SynthadocPlugin();
-        await plugin.onload();
-
-        const ids = (plugin.addCommand as any).mock.calls.map((c: any) => c[0].id);
-        expect(ids).toContain("synthadoc-web-search");
-    });
-});
-
 describe("IngestModal All-sources tab", () => {
     const makeVault = (files: { path: string; extension: string }[]) => ({
         workspace: { getActiveFile: () => null },
@@ -294,7 +267,6 @@ describe("SynthadocPlugin command registration", () => {
             "synthadoc-query",
             "synthadoc-jobs",
             "synthadoc-lint-report",
-            "synthadoc-web-search",
             "synthadoc-lint",
             "synthadoc-jobs-retry-dead",
             "synthadoc-jobs-purge",
@@ -320,7 +292,7 @@ describe("SynthadocPlugin command registration", () => {
 
         const names: string[] = (plugin.addCommand as any).mock.calls.map((c: any) => c[0].name);
         expect(names.some(n => n.startsWith("Query:"))).toBe(true);
-        expect(names.some(n => n.startsWith("Ingest:"))).toBe(true);
+        expect(names.some(n => n.startsWith("Ingest"))).toBe(true);
         expect(names.some(n => n.startsWith("Lint:"))).toBe(true);
         expect(names.some(n => n.startsWith("Jobs:"))).toBe(true);
         expect(names.some(n => n.startsWith("Wiki:"))).toBe(true);
@@ -1862,79 +1834,6 @@ describe("IngestModal URL tab", () => {
         modal.onOpen();
 
         const { btn } = getUrlTab(modal);
-        await btn.onclick();
-
-        expect(apiMock.ingest).not.toHaveBeenCalled();
-    });
-});
-
-// ── WebSearchModal ────────────────────────────────────────────────────────────
-
-describe("WebSearchModal", () => {
-    it("calls api.ingest with 'search for: ' prefix on Search click", async () => {
-        const { ModalClass, apiMock } = await getModal("synthadoc-web-search");
-        apiMock.ingest.mockResolvedValueOnce({ job_id: "ws-job-01" });
-        apiMock.job = vi.fn().mockResolvedValue({ status: "completed", result: {} });
-
-        const modal = new ModalClass();
-        modal.onOpen();
-
-        const textarea = modal.contentEl.querySelector("textarea") as any;
-        textarea.value = "Bank of Canada rate outlook";
-        const btn = modal.contentEl.querySelector("button") as any;
-        await btn.onclick();
-        await flushPromises();
-
-        expect(apiMock.ingest).toHaveBeenCalledWith(
-            "search for: Bank of Canada rate outlook",
-            expect.any(Number),
-        );
-    });
-
-    it("passes maxResults from the input to api.ingest", async () => {
-        const { ModalClass, apiMock } = await getModal("synthadoc-web-search");
-        apiMock.ingest.mockResolvedValueOnce({ job_id: "ws-job-02" });
-        apiMock.job = vi.fn().mockResolvedValue({ status: "completed", result: {} });
-
-        const modal = new ModalClass();
-        modal.onOpen();
-
-        const textarea = modal.contentEl.querySelector("textarea") as any;
-        textarea.value = "Ontario housing market";
-        // settingsRow is _children[3]; maxResultsInput is settingsRow._children[1]
-        const maxInput = modal.contentEl._children[3]._children[1];
-        maxInput.value = "30";
-        const btn = modal.contentEl.querySelector("button") as any;
-        await btn.onclick();
-        await flushPromises();
-
-        expect(apiMock.ingest).toHaveBeenCalledWith("search for: Ontario housing market", 30);
-    });
-
-    it("shows error and re-enables button when api.ingest throws", async () => {
-        const { ModalClass, apiMock } = await getModal("synthadoc-web-search");
-        apiMock.ingest.mockRejectedValueOnce(new Error("refused"));
-
-        const modal = new ModalClass();
-        modal.onOpen();
-
-        const textarea = modal.contentEl.querySelector("textarea") as any;
-        textarea.value = "some topic";
-        const btn = modal.contentEl.querySelector("button") as any;
-        await btn.onclick();
-        await flushPromises();
-
-        expect(btn.disabled).toBe(false);
-        expect(modal.contentEl.innerHTML).toContain("synthadoc serve");
-    });
-
-    it("does nothing when topic textarea is empty", async () => {
-        const { ModalClass, apiMock } = await getModal("synthadoc-web-search");
-
-        const modal = new ModalClass();
-        modal.onOpen();
-
-        const btn = modal.contentEl.querySelector("button") as any;
         await btn.onclick();
 
         expect(apiMock.ingest).not.toHaveBeenCalled();
