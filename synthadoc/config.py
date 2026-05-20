@@ -39,6 +39,7 @@ class AgentsConfig:
     ingest: Optional[AgentConfig] = None
     query: Optional[AgentConfig] = None
     lint: Optional[AgentConfig] = None
+    adversarial: Optional[AgentConfig] = None
     skill: Optional[AgentConfig] = None
     llm_timeout_seconds: int = 0  # 0 = no limit (provider default)
 
@@ -238,7 +239,7 @@ def _raw_to_config(raw: dict, source_has_agents: bool) -> Config:
         llm_timeout_seconds=int(a.get("llm_timeout_seconds", 0)),
     )
 
-    for name in ("ingest", "query", "lint", "skill"):
+    for name in ("ingest", "query", "lint", "adversarial", "skill"):
         if name in a:
             base_vals = {
                 "provider": default_agent.provider,
