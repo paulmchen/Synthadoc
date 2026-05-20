@@ -165,6 +165,7 @@ class IngestRequest(BaseModel):
 class LintRequest(BaseModel):
     scope: str = "all"
     auto_resolve: bool = False
+    adversarial: bool = True
 
 
 class ScaffoldRequest(BaseModel):
@@ -224,7 +225,9 @@ async def _worker_loop(orch) -> None:
                 elif job.operation == "lint":
                     scope = job.payload.get("scope", "all")
                     auto_resolve = job.payload.get("auto_resolve", False)
-                    await orch._run_lint(job.id, scope=scope, auto_resolve=auto_resolve)
+                    adversarial = job.payload.get("adversarial", True)
+                    await orch._run_lint(job.id, scope=scope, auto_resolve=auto_resolve,
+                                         adversarial=adversarial)
                 elif job.operation == "scaffold":
                     domain = job.payload.get("domain", "")
                     await orch._run_scaffold(job.id, domain=domain)
@@ -407,7 +410,8 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
     @app.post("/jobs/lint")
     async def enqueue_lint(req: LintRequest):
         job_id = await app.state.orch.queue.enqueue(
-            "lint", {"scope": req.scope, "auto_resolve": req.auto_resolve}
+            "lint", {"scope": req.scope, "auto_resolve": req.auto_resolve,
+                     "adversarial": req.adversarial}
         )
         return {"job_id": job_id}
 
@@ -462,11 +466,40 @@ def create_app(wiki_root: Path, max_body_bytes: int = _MAX_BODY_BYTES) -> FastAP
                 "index_suggestion": f"- [[{slug}]] — {hint}",
             })
 
+        # Build adversarial_warnings from lint_warnings frontmatter
+        adversarial_warnings = []
+        for stem, text in page_texts.items():
+            if stem in LINT_SKIP_SLUGS:
+                continue
+            fm_m = _FM_RE.match(text)
+            if not fm_m:
+                continue
+            try:
+                fm = _yaml.safe_load(fm_m.group(1)) or {}
+            except Exception:
+                continue
+            warnings = fm.get("lint_warnings", []) or []
+            if not warnings:
+                continue
+            sources = fm.get("sources", []) or []
+            wiki_name = wiki_root.name
+            suggested_reingests = [
+                f'synthadoc ingest "{s["file"]}" -w {wiki_name}'
+                for s in sources
+                if isinstance(s, dict) and s.get("file")
+            ]
+            adversarial_warnings.append({
+                "slug": stem,
+                "warnings": warnings,
+                "suggested_reingests": suggested_reingests,
+            })
+
         return {
             "contradictions": [d["slug"] for d in contradiction_details],
             "contradiction_details": contradiction_details,
             "orphans": [d["slug"] for d in orphan_details],
             "orphan_details": orphan_details,
+            "adversarial_warnings": adversarial_warnings,
         }
 
     @app.get("/jobs")
