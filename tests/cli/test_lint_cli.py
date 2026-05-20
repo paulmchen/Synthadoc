@@ -242,3 +242,45 @@ def test_lint_report_self_link_does_not_rescue_from_orphan(tmp_path, monkeypatch
     result = runner.invoke(app, ["lint", "report", "-w", "mywiki"])
     assert result.exit_code == 0, result.output
     assert "lonely" in result.output
+
+
+def test_lint_report_shows_adversarial_warnings_section(tmp_path, monkeypatch):
+    """lint report shows adversarial warnings when lint_warnings exist in frontmatter."""
+    import synthadoc.cli.install as install_mod
+    flagged_page = (
+        "---\n"
+        "status: active\n"
+        "sources:\n"
+        "  - {file: 'papers/study.pdf', hash: 'abc', size: 1000, ingested: '2026-05-01'}\n"
+        "lint_warnings:\n"
+        "  - claim: 'Claim A was the first.'\n"
+        "    concern: 'Overstated — prior work existed'\n"
+        "---\n\n# Flagged Page\n"
+    )
+    wiki_dir, root = _make_wiki(tmp_path, {
+        "index": "# Index\n",
+        "flagged-page": flagged_page,
+    })
+    monkeypatch.setattr(install_mod, "_read_registry",
+                        lambda: {"mywiki": {"path": str(tmp_path)}})
+    result = runner.invoke(app, ["lint", "report", "-w", "mywiki"])
+    assert result.exit_code == 0, result.output
+    assert "Adversarial" in result.output
+    assert "Claim A was the first." in result.output
+    assert "Overstated" in result.output
+    assert 'synthadoc ingest "papers/study.pdf" -w mywiki' in result.output  # suggested re-ingest
+
+
+def test_lint_report_no_adversarial_section_when_clean(tmp_path, monkeypatch):
+    """lint report omits adversarial section when no lint_warnings in any page."""
+    import synthadoc.cli.install as install_mod
+    wiki_dir, root = _make_wiki(tmp_path, {
+        "index":   "# Index\n",
+        "topic-a": "---\nstatus: active\n---\n\n# Topic A\n\nSee also [[topic-b]].",
+        "topic-b": "---\nstatus: active\n---\n\n# Topic B\n\nRelated to [[topic-a]].",
+    })
+    monkeypatch.setattr(install_mod, "_read_registry",
+                        lambda: {"mywiki": {"path": str(tmp_path)}})
+    result = runner.invoke(app, ["lint", "report", "-w", "mywiki"])
+    assert result.exit_code == 0, result.output
+    assert "Adversarial" not in result.output

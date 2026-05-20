@@ -1211,6 +1211,14 @@ class LintRunModal extends Modal {
         });
         hint.style.cssText = "font-size:11px;color:var(--text-muted);margin-bottom:16px;-webkit-user-select:text;user-select:text";
 
+        const skipAdvRow = contentEl.createEl("div");
+        skipAdvRow.style.cssText = "display:flex;align-items:center;gap:8px;margin-bottom:16px";
+        const skipAdvCb = skipAdvRow.createEl("input", { type: "checkbox" }) as HTMLInputElement;
+        skipAdvCb.id = "lint-skip-adversarial";
+        const skipAdvLbl = skipAdvRow.createEl("label", { text: "Skip adversarial review" });
+        skipAdvLbl.htmlFor = "lint-skip-adversarial";
+        skipAdvLbl.style.cssText = "font-size:13px;cursor:pointer";
+
         const btnRow = contentEl.createEl("div");
         btnRow.style.cssText = "display:flex;align-items:center;gap:8px;justify-content:flex-end";
         const reportLink = btnRow.createEl("a", { text: "Lint report →" });
@@ -1226,13 +1234,15 @@ class LintRunModal extends Modal {
 
         btn.onclick = async () => {
             const autoResolve = cb.checked;
+            const adversarial = !skipAdvCb.checked;
             btn.disabled = true;
             cb.disabled = true;
+            skipAdvCb.disabled = true;
             reportLink.style.display = "none";
             out.empty();
             out.createEl("p", { text: autoResolve ? "⏳ Enqueueing lint with auto-resolve…" : "⏳ Enqueueing lint…" });
             try {
-                const r = await api.lint("all", autoResolve) as any;
+                const r = await api.lint("all", autoResolve, adversarial) as any;
                 const jobId: string = r.job_id;
                 out.empty();
                 out.createEl("p", { text: `⏳ Lint running… (job ${jobId.slice(0, 8)})` });
@@ -1259,10 +1269,15 @@ class LintRunModal extends Modal {
                                 const details: any[] = report.contradiction_details ?? [];
                                 const contradictions: string[] = report.contradictions ?? [];
                                 const orphans: string[] = report.orphans ?? [];
+                                const adversarialWarnings: any[] = report.adversarial_warnings ?? [];
                                 out.empty();
                                 const summary = out.createEl("p");
                                 summary.style.cssText = "font-weight:bold;margin-bottom:6px";
-                                summary.setText(`✅ Done — ${contradictions.length} contradiction(s), ${orphans.length} orphan(s).`);
+                                summary.setText(`✅ Done — ${contradictions.length} contradiction(s), ${orphans.length} orphan(s), ${adversarialWarnings.length} adversarial warning(s).`);
+                                if (adversarialWarnings.length > 0) {
+                                    const advHint = out.createEl("p", { text: "Open Lint report → to see adversarial warning details." });
+                                    advHint.style.cssText = "font-size:11px;color:var(--text-muted);margin-top:4px";
+                                }
                                 for (const d of details) {
                                     const block = out.createEl("div");
                                     block.style.cssText = "margin-bottom:6px";
@@ -1277,7 +1292,7 @@ class LintRunModal extends Modal {
                                 if (orphans.length > 0) {
                                     out.createEl("p", { text: `Orphans: ${orphans.join(", ")}` }).style.cssText = "font-size:12px;color:var(--text-muted)";
                                 }
-                                new Notice(`Synthadoc: lint done — ${contradictions.length} contradictions, ${orphans.length} orphans`);
+                                new Notice(`Synthadoc: lint done — ${contradictions.length} contradictions, ${orphans.length} orphans, ${adversarialWarnings.length} adversarial warnings`);
                             } catch {
                                 out.empty();
                                 out.createEl("p", { text: "✅ Lint complete. Could not load report." });
@@ -1288,6 +1303,7 @@ class LintRunModal extends Modal {
                         }
                         btn.disabled = false;
                         cb.disabled = false;
+                        skipAdvCb.disabled = false;
                         reportLink.style.display = "";
                     } catch {
                         // server unreachable — keep polling silently
@@ -1298,6 +1314,7 @@ class LintRunModal extends Modal {
                 out.createEl("p", { text: "❌ Error: is synthadoc serve running?" });
                 btn.disabled = false;
                 cb.disabled = false;
+                skipAdvCb.disabled = false;
             }
         };
     }
@@ -1324,19 +1341,53 @@ class LintReportModal extends Modal {
 
         api.lintReport().then((r: any) => {
             out.empty();
-            const contradictions: string[] = r.contradictions ?? [];
-            const details: any[] = r.contradiction_details ?? contradictions.map((s: string) => ({ slug: s }));
-            const orphanDetails: Array<{ slug: string; index_suggestion: string }> =
-                r.orphan_details ?? (r.orphans ?? []).map((s: string) => ({ slug: s, index_suggestion: `- [[${s}]]` }));
+            const details: any[] = r.contradiction_details ??
+                (r.contradictions ?? []).map((s: string) => ({ slug: s }));
+            const orphanDetails: any[] = r.orphan_details ??
+                (r.orphans ?? []).map((s: string) => ({ slug: s, index_suggestion: `- [[${s}]]` }));
+            const adversarialWarnings: any[] = r.adversarial_warnings ?? [];
 
-            if (contradictions.length === 0 && orphanDetails.length === 0) {
-                out.createEl("p", { text: "✅ All clear — no contradictions or orphan pages." });
-                return;
-            }
+            // Tab bar
+            const tabBar = out.createEl("div");
+            tabBar.style.cssText = "display:flex;gap:0;margin-bottom:16px;border-bottom:1px solid var(--background-modifier-border)";
 
-            if (details.length > 0) {
-                out.createEl("h4", { text: `❌ Contradicted pages (${details.length})` });
-                const ul = out.createEl("ul");
+            type TabName = "Contradictions" | "Orphans" | "Adversarial";
+            const tabNames: TabName[] = ["Contradictions", "Orphans", "Adversarial"];
+            const tabLabels: Record<TabName, string> = {
+                "Contradictions": `❗ Contradictions (${details.length})`,
+                "Orphans": `🔗 Orphans (${orphanDetails.length})`,
+                "Adversarial": `🔍 Adversarial (${adversarialWarnings.length})`,
+            };
+            const panels: Record<TabName, HTMLElement> = {} as any;
+            const tabBtns: Record<TabName, HTMLElement> = {} as any;
+
+            tabNames.forEach(name => {
+                const btn = tabBar.createEl("div", { text: tabLabels[name] });
+                btn.style.cssText = "padding:6px 14px;cursor:pointer;font-size:13px;border-bottom:2px solid transparent;margin-bottom:-1px;color:var(--text-muted)";
+                tabBtns[name] = btn;
+                const panel = out.createEl("div");
+                panel.style.display = "none";
+                panels[name] = panel;
+            });
+
+            const switchTab = (name: TabName) => {
+                tabNames.forEach(t => {
+                    panels[t].style.display = "none";
+                    tabBtns[t].style.borderBottomColor = "transparent";
+                    tabBtns[t].style.color = "var(--text-muted)";
+                });
+                panels[name].style.display = "";
+                tabBtns[name].style.borderBottomColor = "var(--interactive-accent)";
+                tabBtns[name].style.color = "var(--text-normal)";
+            };
+
+            tabNames.forEach(name => { tabBtns[name].onclick = () => switchTab(name); });
+
+            // Contradictions panel
+            if (details.length === 0) {
+                panels["Contradictions"].createEl("p", { text: "✅ No contradictions found." });
+            } else {
+                const ul = panels["Contradictions"].createEl("ul");
                 details.forEach(({ slug, contradiction_note, unresolved_note }) => {
                     const li = ul.createEl("li");
                     li.createEl("code", { text: slug });
@@ -1352,9 +1403,11 @@ class LintReportModal extends Modal {
                 });
             }
 
-            if (orphanDetails.length > 0) {
-                out.createEl("h4", { text: `🔗 Orphan pages (${orphanDetails.length})` });
-                const ul = out.createEl("ul");
+            // Orphans panel
+            if (orphanDetails.length === 0) {
+                panels["Orphans"].createEl("p", { text: "✅ No orphan pages found." });
+            } else {
+                const ul = panels["Orphans"].createEl("ul");
                 orphanDetails.forEach(({ slug, index_suggestion }) => {
                     const li = ul.createEl("li");
                     li.createEl("code", { text: slug });
@@ -1365,6 +1418,45 @@ class LintReportModal extends Modal {
                     sug.createEl("code", { text: index_suggestion });
                 });
             }
+
+            // Adversarial panel
+            if (adversarialWarnings.length === 0) {
+                panels["Adversarial"].createEl("p", { text: "✅ No adversarial warnings found." });
+            } else {
+                adversarialWarnings.forEach(({ slug, warnings, suggested_reingests }) => {
+                    const block = panels["Adversarial"].createEl("div");
+                    block.style.cssText = "margin-bottom:12px;border-bottom:1px solid var(--background-modifier-border);padding-bottom:8px";
+                    block.createEl("strong", { text: slug });
+                    const warnList = block.createEl("ul");
+                    (warnings as any[]).forEach(({ claim, concern }) => {
+                        const li = warnList.createEl("li");
+                        if (claim) {
+                            const claimEl = li.createEl("div", { text: `⚠ "${claim}"` });
+                            claimEl.style.cssText = "font-size:12px;font-style:italic";
+                        }
+                        const concernEl = li.createEl("div", { text: `Concern: ${concern ?? "(no concern text)"}` });
+                        concernEl.style.cssText = "font-size:11px;color:var(--text-muted);margin-top:2px";
+                    });
+                    if ((suggested_reingests as string[])?.length > 0) {
+                        const reingestDiv = block.createEl("div");
+                        reingestDiv.style.cssText = "margin-top:6px";
+                        reingestDiv.createEl("div", { text: "💡 Re-ingest sources to update this page:" })
+                            .style.cssText = "font-size:11px;color:var(--text-muted)";
+                        (suggested_reingests as string[]).forEach(cmd => {
+                            const p = reingestDiv.createEl("div");
+                            p.createEl("code", { text: cmd })
+                                .style.cssText = "font-size:11px;-webkit-user-select:text;user-select:text";
+                        });
+                    }
+                });
+            }
+
+            // Default to first tab with data, or Contradictions
+            const defaultTab: TabName =
+                details.length > 0 ? "Contradictions" :
+                orphanDetails.length > 0 ? "Orphans" : "Adversarial";
+            switchTab(defaultTab);
+
         }).catch(() => {
             out.empty();
             out.createEl("p", { text: "Error: is synthadoc serve running?" });

@@ -1102,8 +1102,8 @@ All commands are accessible via the Command Palette (`Ctrl/Cmd+P` → type `Synt
 
 | Command                   | What it does                                                                                                                                                                                                             |
 | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `Synthadoc: Lint: run...` | Modal with**Auto-resolve** checkbox. Runs a full lint pass; polls progress live and reports contradiction + orphan counts when complete. Tick the checkbox to automatically resolve contradictions at ≥ 85% confidence. |
-| `Synthadoc: Lint: report` | Full lint report — contradicted pages and orphans with suggested index entries.                                                                                                                                         |
+| `Synthadoc: Lint: run...` | Modal with **Auto-resolve** and **Skip adversarial review** checkboxes. Runs a full lint pass with concurrent adversarial review of every page; polls progress live and reports contradiction, orphan, and adversarial warning counts when complete. Tick **Skip adversarial review** to run lint without the adversarial pass (also clears existing `lint_warnings`). |
+| `Synthadoc: Lint: report` | Full lint report in a 3-tab modal — **Contradictions**, **Orphans**, and **Adversarial**. The Adversarial tab shows each flagged claim with its concern and suggested re-ingest commands derived from the page's source files. |
 
 ### Jobs
 
