@@ -337,12 +337,17 @@ describe("SynthadocPlugin lint commands", () => {
         expect(api.lint).toHaveBeenCalledWith("all", true);
     });
 
-    it("LintRunModal calls api.lint with adversarial=false when skip checkbox is checked", async () => {
-        const { api } = await import("./api");
-        (api.lint as any).mockResolvedValueOnce({ job_id: "job-1" });
+    it("LintRunModal renders 'Skip adversarial review' checkbox", async () => {
+        const { ModalClass } = await getModal("synthadoc-lint");
 
-        await api.lint("all", false, false);  // adversarial=false when skip is checked
-        expect(api.lint).toHaveBeenCalledWith("all", false, false);
+        const modal = new ModalClass();
+        modal.contentEl = makeSmartContentEl();
+        modal.onOpen();
+        // No flush needed — onOpen() is synchronous up to the button click
+
+        const html = modal.contentEl.innerHTML;
+        expect(html).toContain("Skip adversarial review");
+        expect(html).toContain("lint-skip-adversarial");
     });
 });
 
@@ -402,7 +407,8 @@ function makeSmartContentEl(): any {
             _html: opts?.text ?? "",
             get innerHTML(): string {
                 const childHtml = el._children.map((c: any) => c.innerHTML).join("");
-                return el._html + childHtml;
+                const idAttr = el.id ? ` id="${el.id}"` : "";
+                return idAttr + el._html + childHtml;
             },
             set innerHTML(v: string) { el._html = v; },
             addEventListener: vi.fn((event: string, handler: any) => {

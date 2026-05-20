@@ -1274,6 +1274,10 @@ class LintRunModal extends Modal {
                                 const summary = out.createEl("p");
                                 summary.style.cssText = "font-weight:bold;margin-bottom:6px";
                                 summary.setText(`✅ Done — ${contradictions.length} contradiction(s), ${orphans.length} orphan(s), ${adversarialWarnings.length} adversarial warning(s).`);
+                                if (adversarialWarnings.length > 0) {
+                                    const advHint = out.createEl("p", { text: "Open Lint report → to see adversarial warning details." });
+                                    advHint.style.cssText = "font-size:11px;color:var(--text-muted);margin-top:4px";
+                                }
                                 for (const d of details) {
                                     const block = out.createEl("div");
                                     block.style.cssText = "margin-bottom:6px";
