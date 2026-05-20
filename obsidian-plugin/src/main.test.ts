@@ -336,6 +336,14 @@ describe("SynthadocPlugin lint commands", () => {
         await api.lint("all", true);
         expect(api.lint).toHaveBeenCalledWith("all", true);
     });
+
+    it("LintRunModal calls api.lint with adversarial=false when skip checkbox is checked", async () => {
+        const { api } = await import("./api");
+        (api.lint as any).mockResolvedValueOnce({ job_id: "job-1" });
+
+        await api.lint("all", false, false);  // adversarial=false when skip is checked
+        expect(api.lint).toHaveBeenCalledWith("all", false, false);
+    });
 });
 
 describe("SynthadocPlugin new commands registered", () => {
@@ -1667,24 +1675,26 @@ describe("JobsModal", () => {
 describe("LintReportModal", () => {
     it("calls api.lintReport on open", async () => {
         const { ModalClass, apiMock } = await getModal("synthadoc-lint-report");
-        apiMock.lintReport.mockResolvedValueOnce({ contradictions: [], orphans: [] });
+        apiMock.lintReport.mockResolvedValueOnce({ contradictions: [], orphans: [], adversarial_warnings: [] });
 
         const modal = new ModalClass();
+        modal.contentEl = makeSmartContentEl();
         modal.onOpen();
         await flushPromises();
 
         expect(apiMock.lintReport).toHaveBeenCalled();
     });
 
-    it("shows 'All clear' when no contradictions or orphans", async () => {
+    it("shows 'No contradictions found' when no contradictions or orphans", async () => {
         const { ModalClass, apiMock } = await getModal("synthadoc-lint-report");
-        apiMock.lintReport.mockResolvedValueOnce({ contradictions: [], orphans: [] });
+        apiMock.lintReport.mockResolvedValueOnce({ contradictions: [], orphans: [], adversarial_warnings: [] });
 
         const modal = new ModalClass();
+        modal.contentEl = makeSmartContentEl();
         modal.onOpen();
         await flushPromises();
 
-        expect(modal.contentEl.innerHTML).toContain("All clear");
+        expect(modal.contentEl.innerHTML).toContain("No contradictions found");
     });
 
     it("renders contradicted page slug and contradiction note", async () => {
@@ -1693,9 +1703,11 @@ describe("LintReportModal", () => {
             contradictions: ["alan-turing"],
             contradiction_details: [{ slug: "alan-turing", contradiction_note: "Conflicting dates found" }],
             orphans: [],
+            adversarial_warnings: [],
         });
 
         const modal = new ModalClass();
+        modal.contentEl = makeSmartContentEl();
         modal.onOpen();
         await flushPromises();
 
@@ -1709,9 +1721,11 @@ describe("LintReportModal", () => {
             contradictions: [],
             orphans: ["quantum-computing"],
             orphan_details: [{ slug: "quantum-computing", index_suggestion: "- [[quantum-computing]]" }],
+            adversarial_warnings: [],
         });
 
         const modal = new ModalClass();
+        modal.contentEl = makeSmartContentEl();
         modal.onOpen();
         await flushPromises();
 
@@ -1723,10 +1737,71 @@ describe("LintReportModal", () => {
         apiMock.lintReport.mockRejectedValueOnce(new Error("refused"));
 
         const modal = new ModalClass();
+        modal.contentEl = makeSmartContentEl();
         modal.onOpen();
         await flushPromises();
 
         expect(modal.contentEl.innerHTML).toContain("synthadoc serve");
+    });
+
+    it("renders three tabs (Contradictions, Orphans, Adversarial)", async () => {
+        const { ModalClass, apiMock } = await getModal("synthadoc-lint-report");
+        apiMock.lintReport.mockResolvedValueOnce({
+            contradictions: [], contradiction_details: [],
+            orphans: [], orphan_details: [],
+            adversarial_warnings: [],
+        });
+
+        const modal = new ModalClass();
+        modal.contentEl = makeSmartContentEl();
+        modal.onOpen();
+        await flushPromises();
+
+        const html = modal.contentEl.innerHTML;
+        expect(html).toContain("Contradictions");
+        expect(html).toContain("Orphans");
+        expect(html).toContain("Adversarial");
+    });
+
+    it("renders adversarial warnings in adversarial tab", async () => {
+        const { ModalClass, apiMock } = await getModal("synthadoc-lint-report");
+        apiMock.lintReport.mockResolvedValueOnce({
+            contradictions: [], contradiction_details: [],
+            orphans: [], orphan_details: [],
+            adversarial_warnings: [{
+                slug: "transformer-architecture",
+                warnings: [{ claim: "Transformers replaced RNNs.", concern: "Overstated" }],
+                suggested_reingests: ['synthadoc ingest "papers/attention.pdf" -w my-wiki'],
+            }],
+        });
+
+        const modal = new ModalClass();
+        modal.contentEl = makeSmartContentEl();
+        modal.onOpen();
+        await flushPromises();
+
+        const html = modal.contentEl.innerHTML;
+        expect(html).toContain("transformer-architecture");
+        expect(html).toContain("Transformers replaced RNNs.");
+        expect(html).toContain("Overstated");
+        expect(html).toContain("papers/attention.pdf");
+    });
+
+    it("shows no warnings message when adversarial_warnings is empty", async () => {
+        const { ModalClass, apiMock } = await getModal("synthadoc-lint-report");
+        apiMock.lintReport.mockResolvedValueOnce({
+            contradictions: [], contradiction_details: [],
+            orphans: [], orphan_details: [],
+            adversarial_warnings: [],
+        });
+
+        const modal = new ModalClass();
+        modal.contentEl = makeSmartContentEl();
+        modal.onOpen();
+        await flushPromises();
+
+        const html = modal.contentEl.innerHTML;
+        expect(html).toContain("No adversarial warnings found");
     });
 });
 
